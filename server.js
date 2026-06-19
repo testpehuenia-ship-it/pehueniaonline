@@ -582,10 +582,14 @@ app.post('/api/admin/configuraciones', (req, res) => {
   });
 });
 
-// Asegurar que exista la carpeta public/uploads
+// Asegurar que exista la carpeta public/uploads (silenciar errores en entornos de solo lectura como Vercel)
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Advertencia: No se pudo crear la carpeta public/uploads (esperable en Vercel):', err.message);
 }
 
 // Endpoint para subir imagen (base64 WebP)
