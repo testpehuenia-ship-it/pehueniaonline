@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchDashboardStats() {
     try {
-      const res = await fetch('/api/admin/estadisticas');
+      const res = await fetch('/api/admin/estadisticas?_t=' + Date.now());
       const stats = await res.json();
       
       el.statHoy.textContent = stats.noticiasHoy;
@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Config de Analytics
     try {
-      const res = await fetch('/api/admin/configuraciones');
+      const res = await fetch('/api/admin/configuraciones?_t=' + Date.now());
       const configs = await res.json();
       
       el.configGeminiKey.value = configs.gemini_api_key || '';
@@ -232,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchCategorias() {
     try {
-      const res = await fetch('/api/categorias');
+      const res = await fetch('/api/categorias?_t=' + Date.now());
       categorias = await res.json();
       
       el.noticiaCategoria.innerHTML = '';
@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchNoticiasList() {
     try {
-      const res = await fetch('/api/admin/noticias');
+      const res = await fetch('/api/admin/noticias?_t=' + Date.now());
       const noticias = await res.json();
       
       el.noticiasTableBody.innerHTML = '';
@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchPublicidadesList() {
     try {
-      const res = await fetch('/api/admin/publicidades');
+      const res = await fetch('/api/admin/publicidades?_t=' + Date.now());
       const publicidades = await res.json();
       
       el.pubTableBody.innerHTML = '';
@@ -669,7 +669,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchCategoriasConfigList() {
     try {
-      const res = await fetch('/api/categorias');
+      const res = await fetch('/api/categorias?_t=' + Date.now());
       const cats = await res.json();
       
       el.categoriasTableBody.innerHTML = '';

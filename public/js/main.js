@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Ticker de Noticias de Última Hora
   async function fetchNoticiasTicker() {
     try {
-      const res = await fetch('/api/noticias?limite=8');
+      const res = await fetch('/api/noticias?limite=8&_t=' + Date.now());
       const noticias = await res.json();
       
       if (noticias.length === 0) {
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Grid del Hero
   async function fetchNoticiasHero() {
     try {
-      const res = await fetch('/api/noticias?limite=3');
+      const res = await fetch('/api/noticias?limite=3&_t=' + Date.now());
       const noticias = await res.json();
       
       if (noticias.length === 0) {
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       // 1. Obtener todas las categorías
-      const catRes = await fetch('/api/categorias');
+      const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
 
       // Filtrar páginas de navegación fijas y las que van al lateral derecho (Policiales y Curiosidades)
@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // 2. Para cada categoría, cargar noticias
       for (const cat of categoriasHome) {
         const limite = cat.limite_home || 3;
-        const resNews = await fetch(`/api/noticias?categoria=${cat.slug}&limite=${limite}`);
+        const resNews = await fetch(`/api/noticias?categoria=${cat.slug}&limite=${limite}&_t=` + Date.now());
         const noticias = await resNews.json();
 
         if (noticias.length === 0) continue; // Omitir categoría si no tiene noticias
@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchReproductoresAudio() {
     try {
-      const res = await fetch('/api/reproductores');
+      const res = await fetch('/api/reproductores?_t=' + Date.now());
       state.reproductores = await res.json();
       renderReproductores();
     } catch (error) {
@@ -583,13 +583,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     try {
       // Buscar información de la categoría para poner el título correcto
-      const catRes = await fetch('/api/categorias');
+      const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
       const catObj = categorias.find(c => c.slug === categorySlug);
       elements.categoryPageTitle.textContent = catObj ? catObj.nombre : categorySlug.toUpperCase();
 
       // Buscar noticias de esta categoría
-      const res = await fetch(`/api/noticias?categoria=${categorySlug}&limite=20`);
+      const res = await fetch(`/api/noticias?categoria=${categorySlug}&limite=20&_t=` + Date.now());
       const noticias = await res.json();
       
       renderCategoryGrid(noticias);
@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.articleDetailContent.innerHTML = '<div class="shimmer-placeholder" style="height:400px"></div>';
     
     try {
-      const res = await fetch(`/api/noticias/${noticiaId}`);
+      const res = await fetch(`/api/noticias/${noticiaId}?_t=` + Date.now());
       if (!res.ok) throw new Error();
       const noticia = await res.json();
       
@@ -750,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.gridCategoryPosts.innerHTML = '<div class="shimmer-placeholder" style="height:250px; grid-column:1/4"></div>';
 
     try {
-      const res = await fetch('/api/noticias?limite=50');
+      const res = await fetch('/api/noticias?limite=50&_t=' + Date.now());
       const noticias = await res.json();
       const filtradas = noticias.filter(n => 
         n.titulo.toLowerCase().includes(query.toLowerCase()) || 
@@ -810,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchPublicidades() {
     try {
-      const res = await fetch('/api/publicidades');
+      const res = await fetch('/api/publicidades?_t=' + Date.now());
       publicidadesCargadas = await res.json();
       
       desplegarPublicidadesEstaticas();
@@ -1242,7 +1242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     
     try {
-      const catRes = await fetch('/api/categorias');
+      const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
       
       let targetCat = categorias.find(c => c.slug === categorySlug);
@@ -1259,7 +1259,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      const res = await fetch(`/api/noticias?categoria=${targetCat.slug}&limite=3`);
+      const limit = targetCat.limite_home || 3;
+      const res = await fetch(`/api/noticias?categoria=${targetCat.slug}&limite=${limit}&_t=` + Date.now());
       const noticias = await res.json();
       
       if (noticias.length === 0) {
