@@ -142,17 +142,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Modales de noticias
     el.btnNuevaNoticia.addEventListener('click', () => abrirModalNoticia());
     el.btnNuevaNoticiaQuick.addEventListener('click', () => abrirModalNoticia());
-    el.btnGuardarNoticia.addEventListener('click', guardarNoticia);
-    el.btnGuardarConfig.addEventListener('click', guardarConfiguraciones);
+    el.formNoticia.addEventListener('submit', guardarNoticia);
+    el.formConfig.addEventListener('submit', guardarConfiguraciones);
     el.noticiaArchivos.addEventListener('change', manejarSubidaImagenes);
 
     // Publicidad
     el.btnNuevaPublicidad.addEventListener('click', () => abrirModalPublicidad());
-    el.btnGuardarPublicidad.addEventListener('click', guardarPublicidad);
+    el.formPublicidad.addEventListener('submit', guardarPublicidad);
     el.pubArchivoInput.addEventListener('change', manejarSubidaPublicidad);
 
     // Categorías Config
-    el.btnGuardarCategoriaConfig.addEventListener('click', guardarCategoriaConfig);
+    el.formCategoriaConfig.addEventListener('submit', guardarCategoriaConfig);
   }
 
   function switchTab(tabName) {

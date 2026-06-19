@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupEventListeners() {
     el.btnNuevaCampana.addEventListener('click', () => abrirModalCampana());
-    el.btnGuardarCampana.addEventListener('click', guardarCampaña);
+    el.formCampana.addEventListener('submit', guardarCampaña);
   }
 
   // ==========================================
