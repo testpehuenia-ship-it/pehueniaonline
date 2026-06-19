@@ -1517,6 +1517,7 @@ img {
 @media (max-width: 768px) {
   .posts-grid-category-2col {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
   .post-card-horizontal {
     flex-direction: column;
@@ -1524,13 +1525,19 @@ img {
   }
   .post-card-horizontal-thumb {
     width: 100%;
-    height: 180px;
-  }
-  .post-card-horizontal-thumb img {
-    position: static;
+    height: 220px;
   }
   .post-card-horizontal-body {
     width: 100%;
+    padding: 16px;
+    gap: 10px;
+  }
+  .post-card-horizontal-title {
+    font-size: 1.05rem;
+  }
+  .post-card-horizontal-excerpt {
+    font-size: 0.75rem;
+    -webkit-line-clamp: 2;
   }
 }
 
@@ -1931,6 +1938,244 @@ img {
   }
   .cat-block-span-2 .posts-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* ==========================================
+   14. FORMATOS DE DISEÑO DE PORTADA COMPLEMENTARIOS (1 COLUMNA / INFINITE)
+   ========================================== */
+
+/* A. Tarjeta Grande y Texto Chico (1 Columna) */
+.posts-large-image-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  width: 100%;
+}
+
+.post-card-large-image {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--transition-ease);
+  display: flex;
+  flex-direction: column;
+}
+
+.post-card-large-image:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+.post-card-large-image img {
+  width: 100%;
+  height: 380px;
+  object-fit: cover;
+}
+
+.post-card-large-image-body {
+  padding: 16px;
+}
+
+.post-card-large-image-title {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.post-card-large-image-meta {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .post-card-large-image img {
+    height: 200px;
+  }
+  .post-card-large-image-title {
+    font-size: 0.95rem;
+  }
+}
+
+/* B. Título sobre Foto (1 Columna / Overlay) */
+.posts-title-overlay-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.post-card-title-overlay {
+  position: relative;
+  height: 300px;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--transition-ease);
+}
+
+.post-card-title-overlay:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+.post-card-title-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: var(--transition-ease);
+}
+
+.post-card-title-overlay:hover img {
+  transform: scale(1.02);
+}
+
+.post-card-title-overlay-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+  color: #ffffff;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.post-card-title-overlay-cat {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-orange);
+  margin-bottom: 6px;
+}
+
+.post-card-title-overlay-title {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.post-card-title-overlay-meta {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 768px) {
+  .post-card-title-overlay {
+    height: 200px;
+  }
+  .post-card-title-overlay-title {
+    font-size: 0.95rem;
+  }
+  .post-card-title-overlay-content {
+    padding: 16px;
+  }
+}
+
+/* C. Carrusel Infinito de 3 Columnas (Foto + Texto al Lado) */
+.posts-carousel-infinite-container {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.posts-carousel-infinite-wrapper {
+  width: 100%;
+  overflow: hidden;
+}
+
+.posts-carousel-infinite-track {
+  display: flex;
+  gap: 24px;
+  transition: transform 0.5s ease-in-out;
+}
+
+.post-card-carousel-infinite {
+  flex: 0 0 calc((100% - 48px) / 3);
+  display: flex;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--transition-ease);
+  height: 160px;
+}
+
+.post-card-carousel-infinite:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+.post-card-carousel-infinite-thumb {
+  width: 40%;
+  height: 100%;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.post-card-carousel-infinite-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.post-card-carousel-infinite-body {
+  padding: 12px;
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.post-card-carousel-infinite-title {
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.post-card-carousel-infinite-meta {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .post-card-carousel-infinite {
+    flex: 0 0 100%;
+    height: 120px;
+  }
+  .post-card-carousel-infinite-thumb {
+    width: 35%;
+  }
+  .post-card-carousel-infinite-body {
+    width: 65%;
+    padding: 10px;
+  }
+  .post-card-carousel-infinite-title {
+    font-size: 0.75rem;
+    -webkit-line-clamp: 3;
   }
 }
 

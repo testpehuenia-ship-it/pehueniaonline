@@ -352,6 +352,31 @@ document.addEventListener('DOMContentLoaded', () => {
           noticias.forEach(noticia => {
             postsContainer.appendChild(createPostCardMarkup(noticia));
           });
+        } else if (diseno === 'large-image') {
+          postsContainer.className = 'posts-large-image-layout';
+          noticias.forEach(noticia => {
+            postsContainer.appendChild(createPostLargeImageMarkup(noticia));
+          });
+        } else if (diseno === 'title-overlay') {
+          postsContainer.className = 'posts-title-overlay-layout';
+          noticias.forEach(noticia => {
+            postsContainer.appendChild(createPostTitleOverlayMarkup(noticia));
+          });
+        } else if (diseno === 'carousel-infinite') {
+          postsContainer.className = 'posts-carousel-infinite-container';
+          
+          const wrapper = document.createElement('div');
+          wrapper.className = 'posts-carousel-infinite-wrapper';
+          
+          const track = document.createElement('div');
+          track.className = 'posts-carousel-infinite-track';
+          
+          noticias.forEach(noticia => {
+            track.appendChild(createPostCarouselInfiniteMarkup(noticia));
+          });
+          
+          wrapper.appendChild(track);
+          postsContainer.appendChild(wrapper);
         } else {
           // 'grid' (Por defecto)
           postsContainer.className = 'posts-grid';
@@ -386,6 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
           container.appendChild(adBlock);
         }
       }
+
+      // Inicializar carruseles infinitos después de renderizar todo el Home
+      initInfiniteCarousels();
 
     } catch (err) {
       console.error('Error al cargar noticias de categorías dinámicas:', err);
@@ -926,6 +954,132 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     item.addEventListener('click', () => showArticleDetail(noticia.id));
     return item;
+  }
+
+  function createPostLargeImageMarkup(noticia) {
+    const card = document.createElement('div');
+    card.className = 'post-card-large-image';
+    
+    const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=600';
+    const imagen = noticia.imagen_url || defaultImg;
+    const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
+
+    card.innerHTML = `
+      <img src="${imagen}" alt="${noticia.titulo}">
+      <div class="post-card-large-image-body">
+        <span class="post-card-category" style="color: var(--color-orange);">${noticia.categoria_nombre || noticia.categoria_name}</span>
+        <h3 class="post-card-large-image-title">${noticia.titulo}</h3>
+        <div class="post-card-large-image-meta">
+          <span>${fecha} | <i class="fa-regular fa-eye"></i> ${noticia.visitas}</span>
+        </div>
+      </div>
+    `;
+    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    return card;
+  }
+
+  function createPostTitleOverlayMarkup(noticia) {
+    const card = document.createElement('div');
+    card.className = 'post-card-title-overlay';
+    
+    const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=600';
+    const imagen = noticia.imagen_url || defaultImg;
+    const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
+
+    card.innerHTML = `
+      <img src="${imagen}" alt="${noticia.titulo}">
+      <div class="post-card-title-overlay-content">
+        <span class="post-card-title-overlay-cat">${noticia.categoria_nombre || noticia.categoria_name}</span>
+        <h3 class="post-card-title-overlay-title">${noticia.titulo}</h3>
+        <div class="post-card-title-overlay-meta">
+          <span>${fecha} | <i class="fa-regular fa-eye"></i> ${noticia.visitas}</span>
+        </div>
+      </div>
+    `;
+    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    return card;
+  }
+
+  function createPostCarouselInfiniteMarkup(noticia) {
+    const card = document.createElement('div');
+    card.className = 'post-card-carousel-infinite';
+    
+    const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=400';
+    const imagen = noticia.imagen_url || defaultImg;
+    const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
+
+    card.innerHTML = `
+      <div class="post-card-carousel-infinite-thumb">
+        <img src="${imagen}" alt="${noticia.titulo}">
+      </div>
+      <div class="post-card-carousel-infinite-body">
+        <div>
+          <span class="post-card-category" style="color: var(--color-orange); font-size: 0.6rem; display: block; margin-bottom: 2px;">${noticia.categoria_nombre || noticia.categoria_name}</span>
+          <h3 class="post-card-carousel-infinite-title">${noticia.titulo}</h3>
+        </div>
+        <div class="post-card-carousel-infinite-meta">
+          <span>${fecha}</span>
+        </div>
+      </div>
+    `;
+    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    return card;
+  }
+
+  function initInfiniteCarousels() {
+    const carousels = document.querySelectorAll('.posts-carousel-infinite-wrapper');
+    carousels.forEach(wrapper => {
+      const track = wrapper.querySelector('.posts-carousel-infinite-track');
+      const cards = track.querySelectorAll('.post-card-carousel-infinite');
+      if (cards.length <= 1) return;
+      
+      let currentIndex = 0;
+      let intervalId = null;
+      
+      function getVisibleCount() {
+        return window.innerWidth <= 768 ? 1 : 3;
+      }
+      
+      function slide() {
+        const visibleCount = getVisibleCount();
+        const totalCount = cards.length;
+        const maxIndex = Math.max(0, totalCount - visibleCount);
+        
+        currentIndex++;
+        if (currentIndex > maxIndex) {
+          currentIndex = 0;
+        }
+        
+        const card = cards[0];
+        const cardWidth = card.getBoundingClientRect().width;
+        const gap = 24;
+        const offset = currentIndex * (cardWidth + gap);
+        
+        track.style.transform = `translateX(-${offset}px)`;
+      }
+      
+      function start() {
+        stop();
+        intervalId = setInterval(slide, 3000);
+      }
+      
+      function stop() {
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      }
+      
+      start();
+      
+      wrapper.addEventListener('mouseenter', stop);
+      wrapper.addEventListener('mouseleave', start);
+      
+      window.addEventListener('resize', () => {
+        currentIndex = 0;
+        track.style.transform = 'translateX(0)';
+      });
+    });
   }
 
   // ==========================================

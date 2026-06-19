@@ -647,6 +647,9 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (cat.diseno_home === 'list') disenoLabel = 'Lista compacta';
         else if (cat.diseno_home === 'featured') disenoLabel = 'Destacada + Lista';
         else if (cat.diseno_home === 'mosaic') disenoLabel = 'Mosaico asimétrico';
+        else if (cat.diseno_home === 'large-image') disenoLabel = 'Foto Grande (1 Col)';
+        else if (cat.diseno_home === 'title-overlay') disenoLabel = 'Título s/ Foto (1 Col)';
+        else if (cat.diseno_home === 'carousel-infinite') disenoLabel = 'Carrusel Infinito (3 Cols)';
 
         tr.innerHTML = `
           <td style="font-weight:600">${cat.nombre}</td>
