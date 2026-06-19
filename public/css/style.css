@@ -69,6 +69,11 @@ body.dark-theme {
   padding: 0;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
@@ -1278,14 +1283,29 @@ img {
   }
   
   .dropdown-menu {
+    display: none;
     position: static;
-    opacity: 1;
-    visibility: visible;
+    opacity: 0;
+    visibility: hidden;
     box-shadow: none;
     border: none;
     transform: none;
     padding-left: 20px;
     background-color: var(--bg-primary);
+  }
+  
+  .dropdown.open .dropdown-menu {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .nav-search input {
+    width: 90px;
+  }
+  
+  .nav-search input:focus {
+    width: 130px;
   }
   
   .hero-grid {
