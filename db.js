@@ -136,13 +136,6 @@ db.serialize(() => {
   });
   stmtCat.finalize();
 
-  // Asegurar que las categorías existentes tengan asignados sus hermosos diseños predeterminados
-  db.run("UPDATE categorias SET diseno_home = 'mosaic', limite_home = 3 WHERE slug = 'provinciales'");
-  db.run("UPDATE categorias SET diseno_home = 'grid', limite_home = 3 WHERE slug = 'nacionales'");
-  db.run("UPDATE categorias SET diseno_home = 'carousel', limite_home = 6 WHERE slug = 'deportes'");
-  db.run("UPDATE categorias SET diseno_home = 'list', limite_home = 4 WHERE slug = 'policiales'");
-  db.run("UPDATE categorias SET diseno_home = 'featured', limite_home = 3 WHERE slug = 'tecnologia'");
-
   // Insertar campañas por defecto (WPeMatico feeds del usuario)
   db.get('SELECT COUNT(*) as count FROM campanas', (err, row) => {
     if (!err && row.count === 0) {
