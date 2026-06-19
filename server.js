@@ -666,19 +666,67 @@ app.post('/api/admin/subir-imagen', (req, res) => {
 
 // --- APIs de Publicidades ---
 
+// Funciones auxiliares para sincronización de publicidades en la nube
+async function syncPublicidadesToCloud() {
+  db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
+    if (!err && rows) {
+      try {
+        const val = Buffer.from(JSON.stringify(rows)).toString('hex');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+        await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/publicidades_config/${val}`, {
+          method: 'POST',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+      } catch (e) {
+        console.error('Error al sincronizar publicidades con la nube:', e.message);
+      }
+    }
+  });
+}
+
+async function getPublicidadesFromCloud(sqliteRows) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+    const kvRes = await fetch('https://keyvalue.immanuel.co/api/KeyVal/GetValue/nwoxgbkq/publicidades_config', {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (kvRes.ok) {
+      const text = await kvRes.text();
+      if (text) {
+        const hexClean = text.replace(/"/g, '').trim();
+        if (hexClean) {
+          const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
+          return JSON.parse(decodedString);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error al recuperar publicidades desde la nube:', e.message);
+  }
+  return sqliteRows;
+}
+
 // Obtener publicidades activas (público)
 app.get('/api/publicidades', (req, res) => {
-  db.all('SELECT * FROM publicidades WHERE activo = 1', (err, rows) => {
+  db.all('SELECT * FROM publicidades WHERE activo = 1', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    const cloudRows = await getPublicidadesFromCloud(rows);
+    const activeCloudRows = cloudRows.filter(r => r.activo === 1);
+    res.json(activeCloudRows);
   });
 });
 
 // Obtener todas las publicidades (admin)
 app.get('/api/admin/publicidades', (req, res) => {
-  db.all('SELECT * FROM publicidades ORDER BY id DESC', (err, rows) => {
+  db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    const cloudRows = await getPublicidadesFromCloud(rows);
+    res.json(cloudRows);
   });
 });
 
@@ -690,6 +738,7 @@ app.post('/api/admin/publicidades', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?)
   `, [nombre, tipo, formato, url_archivo, url_destino, activo], function(err) {
     if (err) return res.status(500).json({ error: err.message });
+    syncPublicidadesToCloud();
     res.json({ id: this.lastID, message: 'Publicidad creada con éxito' });
   });
 });
@@ -704,6 +753,7 @@ app.put('/api/admin/publicidades/:id', (req, res) => {
     WHERE id = ?
   `, [nombre, tipo, formato, url_archivo, url_destino, activo, id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
+    syncPublicidadesToCloud();
     res.json({ message: 'Publicidad actualizada con éxito' });
   });
 });
@@ -713,6 +763,7 @@ app.delete('/api/admin/publicidades/:id', (req, res) => {
   const id = req.params.id;
   db.run('DELETE FROM publicidades WHERE id = ?', [id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
+    syncPublicidadesToCloud();
     res.json({ message: 'Publicidad eliminada con éxito' });
   });
 });
@@ -764,7 +815,7 @@ app.put('/api/admin/categorias/:id', (req, res) => {
 });
 
 // --- Endpoint de Carga Genérica de Archivos (Imágenes, GIFs, Videos) ---
-app.post('/api/admin/subir-archivo', (req, res) => {
+app.post('/api/admin/subir-archivo', async (req, res) => {
   const { archivoBase64 } = req.body;
   if (!archivoBase64) {
     return res.status(400).json({ error: 'No se recibió ningún archivo base64' });
@@ -795,6 +846,32 @@ app.post('/api/admin/subir-archivo', (req, res) => {
       }
     }
 
+    // SI ESTAMOS EN VERCEL O PRODUCCIÓN: Subir a Catbox para evitar limitaciones de solo lectura y temporalidad
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+      const formData = new FormData();
+      formData.append('reqtype', 'fileupload');
+      
+      const blob = new Blob([buffer], { type: mimeType });
+      formData.append('fileToUpload', blob, `upload_${Date.now()}.${ext}`);
+
+      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Catbox subida falló: ${uploadRes.statusText}`);
+      }
+
+      const fileUrl = await uploadRes.text();
+      if (fileUrl && fileUrl.startsWith('http')) {
+        return res.json({ url: fileUrl.trim() });
+      } else {
+        throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+      }
+    }
+
+    // DESARROLLO LOCAL: Guardar en el sistema de archivos local
     const uniqueName = `file_${Date.now()}_${Math.round(Math.random() * 1000)}.${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
 
