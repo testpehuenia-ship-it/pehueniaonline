@@ -96,6 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (tabParam === 'noticias') {
       switchTab('noticias');
+    } else if (tabParam === 'publicidad') {
+      switchTab('publicidad');
+    } else if (tabParam === 'categorias') {
+      switchTab('categorias');
     } else if (tabParam === 'config') {
       switchTab('config');
       abrirModal('modal-configuraciones');
