@@ -363,10 +363,47 @@ inicializarCronCampanas();
 
 // --- APIs Públicas ---
 
-// Obtener todas las categorías
+// Obtener todas las categorías (sincronizando con almacén en la nube para persistencia serverless)
 app.get('/api/categorias', (req, res) => {
-  db.all('SELECT * FROM categorias', (err, rows) => {
+  db.all('SELECT * FROM categorias', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
+
+    try {
+      // Intentar recuperar configuraciones de diseño en la nube (evitando problemas de stateless en Vercel)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+      
+      const kvRes = await fetch('https://keyvalue.immanuel.co/api/KeyVal/GetValue/nwoxgbkq/categorias_config', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (kvRes.ok) {
+        const text = await kvRes.text();
+        if (text) {
+          const hexClean = text.replace(/"/g, '').trim();
+          if (hexClean) {
+            const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
+            const cloudConfig = JSON.parse(decodedString);
+            
+            // Mezclar configuraciones de la nube en los registros locales
+            rows = rows.map(row => {
+              if (cloudConfig[row.slug]) {
+                return {
+                  ...row,
+                  diseno_home: cloudConfig[row.slug].diseno_home || row.diseno_home,
+                  limite_home: cloudConfig[row.slug].limite_home || row.limite_home
+                };
+              }
+              return row;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error al sincronizar categorías con la nube:', e.message);
+    }
+
     res.json(rows);
   });
 });
@@ -682,17 +719,47 @@ app.delete('/api/admin/publicidades/:id', (req, res) => {
 
 // --- API de Configuración de Diseño de Categorías ---
 
-// Actualizar configuración de diseño y límite de una categoría
+// Actualizar configuración de diseño y límite de una categoría (guardando en SQLite y sincronizando con la nube)
 app.put('/api/admin/categorias/:id', (req, res) => {
   const id = req.params.id;
   const { diseno_home, limite_home } = req.body;
+  
   db.run(`
     UPDATE categorias
     SET diseno_home = ?, limite_home = ?
     WHERE id = ?
   `, [diseno_home, limite_home, id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: 'Diseño de categoría actualizado con éxito' });
+
+    // Sincronizar todo el mapa de configuraciones de categorías con la nube
+    db.all('SELECT slug, diseno_home, limite_home FROM categorias', async (selectErr, rows) => {
+      if (!selectErr && rows) {
+        try {
+          const config = {};
+          rows.forEach(row => {
+            config[row.slug] = {
+              diseno_home: row.diseno_home,
+              limite_home: row.limite_home
+            };
+          });
+
+          const val = Buffer.from(JSON.stringify(config)).toString('hex');
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
+          await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/categorias_config/${val}`, {
+            method: 'POST',
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+        } catch (e) {
+          console.error('Error al subir configuraciones de categorías a la nube:', e.message);
+        }
+      }
+      
+      // Retornar éxito inmediatamente para no bloquear el cliente
+      res.json({ message: 'Diseño de categoría actualizado con éxito' });
+    });
   });
 });
 
