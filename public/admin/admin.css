@@ -562,3 +562,251 @@ body {
     max-height: 95vh;
   }
 }
+
+/* ==========================================
+   7. MAPA DE DISTRIBUCIÓN (CROQUIS) EN ADMIN
+   ========================================== */
+.croquis-container {
+  margin-top: 32px;
+  background-color: var(--admin-card-bg);
+  padding: 24px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.croquis-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 8px;
+}
+
+.croquis-title-bar h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.croquis-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.croquis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background-color: #f1f5f9;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.75rem;
+}
+
+.dark-theme .croquis-grid {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.croquis-span-4 {
+  grid-column: span 4;
+}
+
+.croquis-span-3 {
+  grid-column: span 3;
+}
+
+.croquis-span-2 {
+  grid-column: span 2;
+}
+
+.croquis-span-1 {
+  grid-column: span 1;
+}
+
+.croquis-header-block {
+  background-color: #e2e8f0;
+  border: 1px dashed #94a3b8;
+  color: #64748b;
+  text-align: center;
+  padding: 12px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.dark-theme .croquis-header-block {
+  background-color: #334155;
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+/* Categoria container visual block */
+.croquis-cat-group {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.dark-theme .croquis-cat-group {
+  border-color: #475569;
+  background-color: #0f172a;
+}
+
+.croquis-cat-header {
+  font-weight: 700;
+  color: var(--color-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+/* Items inside categories */
+.croquis-subgrid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.croquis-subgrid-3-mosaic {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 60px);
+  gap: 6px;
+}
+
+.croquis-mosaic-large {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.croquis-featured-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 6px;
+}
+
+.croquis-featured-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.croquis-item {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 48px;
+}
+
+.dark-theme .croquis-item {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.croquis-news {
+  border-left: 3px solid #3b82f6;
+  color: var(--text-main);
+}
+
+.croquis-news strong {
+  color: #3b82f6;
+  font-size: 0.85rem;
+}
+
+.croquis-sidebar-group {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #f8fafc;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.dark-theme .croquis-sidebar-group {
+  border-color: #475569;
+  background-color: #1e293b;
+}
+
+.croquis-widget {
+  background-color: #e0f2fe;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  border-left: 3px solid #0284c7;
+}
+
+.dark-theme .croquis-widget {
+  background-color: #0c4a6e;
+  border-color: #075985;
+  color: #e0f2fe;
+}
+
+.croquis-widget strong {
+  color: #0284c7;
+}
+
+.dark-theme .croquis-widget strong {
+  color: #38bdf8;
+}
+
+/* Ad spaces */
+.croquis-ad {
+  background-color: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.dark-theme .croquis-ad {
+  background-color: #334155;
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+/* Highlighted Ads in Advertising panel */
+.croquis-ad-highlight {
+  background-color: #fef3c7 !important;
+  border: 2px solid #f59e0b !important;
+  color: #b45309 !important;
+  animation: pulse-border 2s infinite;
+  font-weight: 700 !important;
+}
+
+.dark-theme .croquis-ad-highlight {
+  background-color: #78350f !important;
+  border-color: #f59e0b !important;
+  color: #fef3c7 !important;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+

@@ -191,7 +191,252 @@
               <tbody id="publicidad-table-body">
                 <!-- Cargado con JavaScript -->
               </tbody>
-            </table>
+          </div>
+        </div>
+
+        <!-- Croquis de Distribución en Portada (Publicidad Resaltada) -->
+        <div class="croquis-container">
+          <div class="croquis-title-bar">
+            <h3><i class="fa-solid fa-map"></i> Mapa de Ubicación de Banners de Publicidad</h3>
+          </div>
+          <p class="croquis-desc">Los espacios publicitarios (P) están resaltados en amarillo brillante a continuación para mostrar de forma exacta dónde aparecerá cada banner en la grilla izquierda o barra lateral de la portada del diario.</p>
+          
+          <div class="croquis-grid">
+            <!-- Header -->
+            <div class="croquis-header-block croquis-span-4" style="margin-bottom: 8px;">
+              Cabecera del Diario (Logotipo, Clima, Cotizaciones Rápidas y Ticker de Noticias)
+            </div>
+            
+            <!-- Banner Superior -->
+            <div class="croquis-item croquis-ad-highlight croquis-span-4" style="min-height: 50px; margin-bottom: 8px;">
+              <strong>Publicidad: Banner Superior (P-Superior)</strong>
+              <span>Tamaño: 1200x200 o 1200x100 (Ocupa el ancho completo de la portada)</span>
+            </div>
+            
+            <!-- Fila 1: Hero Destacados + Radios / P3 -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">NOTICIAS DESTACADAS (HERO - ÚLTIMAS NOTICIAS GENERALES)</div>
+                <div class="croquis-subgrid-3-mosaic">
+                  <div class="croquis-item croquis-news croquis-mosaic-large">
+                    <strong>N1</strong>
+                    <span>Noticia Principal (Portada)</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N2</strong>
+                    <span>Secundaria 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N3</strong>
+                    <span>Secundaria 2</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget</strong>
+                  <span>Radios FM Pehuenia y Moquehue</span>
+                </div>
+                <div class="croquis-item croquis-ad-highlight">
+                  <strong>Publicidad: Lateral 1 (P3)</strong>
+                  <span>300x300</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Fila 2: Locales y Provinciales + Widget Policiales -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Locales y Provinciales (Diseño Mosaico - 3 Columnas)</div>
+                <div class="croquis-subgrid-3-mosaic">
+                  <div class="croquis-item croquis-news croquis-mosaic-large">
+                    <strong>N4</strong>
+                    <span>Artículo Principal</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N5</strong>
+                    <span>Artículo Secundario 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N6</strong>
+                    <span>Artículo Secundario 2</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Policiales (Lateral)</strong>
+                  <span>Lista compacta (N22, N23, N24)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 3: Nacionales (Grid 2 cols) + Ad P1 + Widget Clima -->
+            <div class="croquis-span-2">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Nacionales (Diseño Grilla - 2 Columnas)</div>
+                <div class="croquis-subgrid-2">
+                  <div class="croquis-item croquis-news">
+                    <strong>N7</strong>
+                    <span>Artículo 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N8</strong>
+                    <span>Artículo 2</span>
+                  </div>
+                  <div class="croquis-item croquis-news" style="grid-column: span 2;">
+                    <strong>N9</strong>
+                    <span>Artículo 3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-ad-highlight" style="height: 100%; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-radius: 4px;">
+                <strong>Publicidad P1</strong>
+                <span>Auto-Relleno (300x300)</span>
+                <small>Completa las 3 columnas izquierdas</small>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Clima</strong>
+                  <span>Villa Pehuenia (5 días)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 4: Internacionales (Grid 2 cols) + Ad P2 + Widget Cotizaciones -->
+            <div class="croquis-span-2">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Internacionales (Diseño Grilla - 2 Columnas)</div>
+                <div class="croquis-subgrid-2">
+                  <div class="croquis-item croquis-news">
+                    <strong>N10</strong>
+                    <span>Artículo 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N11</strong>
+                    <span>Artículo 2</span>
+                  </div>
+                  <div class="croquis-item croquis-news" style="grid-column: span 2;">
+                    <strong>N12</strong>
+                    <span>Artículo 3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-ad-highlight" style="height: 100%; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-radius: 4px;">
+                <strong>Publicidad P2</strong>
+                <span>Auto-Relleno (300x300)</span>
+                <small>Completa las 3 columnas izquierdas</small>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Economía</strong>
+                  <span>Cotización de Monedas y Dólar</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 5: Deportes + Widget Entretenimiento -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Deportes (Diseño Carrusel Horizontal - 3 Columnas)</div>
+                <div class="croquis-subgrid-2" style="grid-template-columns: repeat(3, 1fr);">
+                  <div class="croquis-item croquis-news">
+                    <strong>N13</strong>
+                    <span>Artículo 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N14</strong>
+                    <span>Artículo 2</span>
+                  </div>
+                  <div class="croquis-item" style="background-color:#f1f5f9; border: 1px dashed #cbd5e1; color:#64748b; display:flex; justify-content:center; align-items:center; font-weight:600;">
+                    N15 a N18 (Slider...)
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Curiosidades</strong>
+                  <span>Lista compacta (N25, N26, N27)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 6: Tecnología + Widget Fixture -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Tecnología (Diseño Destacada + Lista - 3 Columnas)</div>
+                <div class="croquis-featured-layout">
+                  <div class="croquis-item croquis-news" style="min-height: 100px;">
+                    <strong>N19 (Destacada)</strong>
+                    <span>Artículo Grande</span>
+                  </div>
+                  <div class="croquis-featured-list">
+                    <div class="croquis-item croquis-news">
+                      <strong>N20</strong>
+                      <span>Secundario 1</span>
+                    </div>
+                    <div class="croquis-item croquis-news">
+                      <strong>N21</strong>
+                      <span>Secundario 2</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Fixture</strong>
+                  <span>Partidos de la Copa Mundial</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 7: Espacio libre de categorías + Widget Mascotas + Editorial -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group" style="border: 1px dashed #cbd5e1; background-color: transparent; justify-content: center; align-items: center; min-height: 150px; text-align: center; color: var(--text-muted);">
+                <strong>Otras Categorías Activas...</strong>
+                <span>(Se apilarán aquí de forma inteligente si se activan en su configuración)</span>
+              </div>
+            </div>
+            <div class="croquis-span-1" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Mascotas</strong>
+                  <span>Lista compacta (N28, N29, N30)</span>
+                </div>
+                <div class="croquis-item croquis-ad-highlight">
+                  <strong>Publicidad: Lateral 2 (P4)</strong>
+                  <span>300x300</span>
+                </div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Editorial</strong>
+                  <span>Carta de Opinión de Redacción</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
@@ -218,10 +463,252 @@
                   <th>Acciones</th>
                 </tr>
               </thead>
-              <tbody id="categorias-table-body">
-                <!-- Cargado con JavaScript -->
-              </tbody>
-            </table>
+          </div>
+        </div>
+
+        <!-- Croquis de Distribución en Portada (Categorías) -->
+        <div class="croquis-container">
+          <div class="croquis-title-bar">
+            <h3><i class="fa-solid fa-map"></i> Mapa de Distribución en la Portada (Inicio)</h3>
+          </div>
+          <p class="croquis-desc">Visualiza cómo se organizan las categorías (N) y espacios publicitarios (P) en las 4 columnas de la portada del diario (3 columnas a la izquierda para el cuerpo principal de noticias y 1 columna lateral derecha para widgets).</p>
+          
+          <div class="croquis-grid">
+            <!-- Header -->
+            <div class="croquis-header-block croquis-span-4" style="margin-bottom: 8px;">
+              Cabecera del Diario (Logotipo, Clima, Cotizaciones Rápidas y Ticker de Noticias)
+            </div>
+            
+            <!-- Banner Superior -->
+            <div class="croquis-item croquis-ad croquis-span-4" style="min-height: 50px; margin-bottom: 8px;">
+              <strong>Publicidad: Banner Superior (P-Superior)</strong>
+              <span>Tamaño: 1200x200 o 1200x100 (Ocupa el ancho completo)</span>
+            </div>
+            
+            <!-- Fila 1: Hero Destacados + Radios / P3 -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">NOTICIAS DESTACADAS (HERO - ÚLTIMAS NOTICIAS GENERALES)</div>
+                <div class="croquis-subgrid-3-mosaic">
+                  <div class="croquis-item croquis-news croquis-mosaic-large">
+                    <strong>N1</strong>
+                    <span>Noticia Principal (Portada)</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N2</strong>
+                    <span>Secundaria 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N3</strong>
+                    <span>Secundaria 2</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget</strong>
+                  <span>Radios FM Pehuenia y Moquehue</span>
+                </div>
+                <div class="croquis-item croquis-ad">
+                  <strong>Publicidad: Lateral 1 (P3)</strong>
+                  <span>300x300</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Fila 2: Locales y Provinciales + Widget Policiales -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Locales y Provinciales (Diseño Mosaico - 3 Columnas)</div>
+                <div class="croquis-subgrid-3-mosaic">
+                  <div class="croquis-item croquis-news croquis-mosaic-large">
+                    <strong>N4</strong>
+                    <span>Artículo Principal</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N5</strong>
+                    <span>Artículo Secundario 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N6</strong>
+                    <span>Artículo Secundario 2</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Policiales (Lateral)</strong>
+                  <span>Lista compacta (N22, N23, N24)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 3: Nacionales (Grid 2 cols) + Ad P1 + Widget Clima -->
+            <div class="croquis-span-2">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Nacionales (Diseño Grilla - 2 Columnas)</div>
+                <div class="croquis-subgrid-2">
+                  <div class="croquis-item croquis-news">
+                    <strong>N7</strong>
+                    <span>Artículo 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N8</strong>
+                    <span>Artículo 2</span>
+                  </div>
+                  <div class="croquis-item croquis-news" style="grid-column: span 2;">
+                    <strong>N9</strong>
+                    <span>Artículo 3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-ad" style="height: 100%; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-radius: 4px;">
+                <strong>Publicidad P1</strong>
+                <span>Auto-Relleno (300x300)</span>
+                <small>Completa las 3 columnas izquierdas</small>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Clima</strong>
+                  <span>Villa Pehuenia (5 días)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 4: Internacionales (Grid 2 cols) + Ad P2 + Widget Cotizaciones -->
+            <div class="croquis-span-2">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Internacionales (Diseño Grilla - 2 Columnas)</div>
+                <div class="croquis-subgrid-2">
+                  <div class="croquis-item croquis-news">
+                    <strong>N10</strong>
+                    <span>Artículo 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N11</strong>
+                    <span>Artículo 2</span>
+                  </div>
+                  <div class="croquis-item croquis-news" style="grid-column: span 2;">
+                    <strong>N12</strong>
+                    <span>Artículo 3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-ad" style="height: 100%; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-radius: 4px;">
+                <strong>Publicidad P2</strong>
+                <span>Auto-Relleno (300x300)</span>
+                <small>Completa las 3 columnas izquierdas</small>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Economía</strong>
+                  <span>Cotización de Monedas y Dólar</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 5: Deportes + Widget Entretenimiento -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Deportes (Diseño Carrusel Horizontal - 3 Columnas)</div>
+                <div class="croquis-subgrid-2" style="grid-template-columns: repeat(3, 1fr);">
+                  <div class="croquis-item croquis-news">
+                    <strong>N13</strong>
+                    <span>Artículo 1</span>
+                  </div>
+                  <div class="croquis-item croquis-news">
+                    <strong>N14</strong>
+                    <span>Artículo 2</span>
+                  </div>
+                  <div class="croquis-item" style="background-color:#f1f5f9; border: 1px dashed #cbd5e1; color:#64748b; display:flex; justify-content:center; align-items:center; font-weight:600;">
+                    N15 a N18 (Slider...)
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Curiosidades</strong>
+                  <span>Lista compacta (N25, N26, N27)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 6: Tecnología + Widget Fixture -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group">
+                <div class="croquis-cat-header">Categoría: Tecnología (Diseño Destacada + Lista - 3 Columnas)</div>
+                <div class="croquis-featured-layout">
+                  <div class="croquis-item croquis-news" style="min-height: 100px;">
+                    <strong>N19 (Destacada)</strong>
+                    <span>Artículo Grande</span>
+                  </div>
+                  <div class="croquis-featured-list">
+                    <div class="croquis-item croquis-news">
+                      <strong>N20</strong>
+                      <span>Secundario 1</span>
+                    </div>
+                    <div class="croquis-item croquis-news">
+                      <strong>N21</strong>
+                      <span>Secundario 2</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="croquis-span-1">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Fixture</strong>
+                  <span>Partidos de la Copa Mundial</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila 7: Espacio libre de categorías + Widget Mascotas + Editorial -->
+            <div class="croquis-span-3">
+              <div class="croquis-cat-group" style="border: 1px dashed #cbd5e1; background-color: transparent; justify-content: center; align-items: center; min-height: 150px; text-align: center; color: var(--text-muted);">
+                <strong>Otras Categorías Activas...</strong>
+                <span>(Se apilarán aquí de forma inteligente si se activan en su configuración)</span>
+              </div>
+            </div>
+            <div class="croquis-span-1" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="croquis-sidebar-group">
+                <div class="croquis-cat-header">Columna Lateral</div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Mascotas</strong>
+                  <span>Lista compacta (N28, N29, N30)</span>
+                </div>
+                <div class="croquis-item croquis-ad">
+                  <strong>Publicidad: Lateral 2 (P4)</strong>
+                  <span>300x300</span>
+                </div>
+                <div class="croquis-item croquis-widget">
+                  <strong>Widget: Editorial</strong>
+                  <span>Carta de Opinión de Redacción</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

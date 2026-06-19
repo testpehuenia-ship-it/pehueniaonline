@@ -278,8 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
 
-      // Filtrar páginas de navegación fijas y las que van al lateral derecho (Policiales y Curiosidades)
-      const categoriasHome = categorias.filter(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto' && c.slug !== 'policiales' && c.slug !== 'entretenimiento-y-curiosidades');
+      // Filtrar páginas de navegación fijas y las que van al lateral derecho (Policiales, Curiosidades y Mascotas)
+      const categoriasHome = categorias.filter(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto' && c.slug !== 'policiales' && c.slug !== 'entretenimiento-y-curiosidades' && c.slug !== 'mascotas');
+
 
       container.innerHTML = '';
       let indexC = 0;

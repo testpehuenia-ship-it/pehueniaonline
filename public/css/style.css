@@ -573,7 +573,8 @@ img {
   grid-column: span 3;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  column-gap: 24px;
+  row-gap: 48px; /* Agrandada la división vertical entre bloques de categoría */
   align-content: start;
 }
 
