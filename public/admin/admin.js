@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (tabParam === 'categorias') {
       switchTab('categorias');
     } else if (tabParam === 'config') {
-      switchTab('config');
+      switchTab('inicio');
       abrirModal('modal-configuraciones');
     } else {
       switchTab('inicio');
@@ -113,11 +113,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
 
   function setupEventListeners() {
-    el.tabInicio.addEventListener('click', () => switchTab('inicio'));
-    el.tabNoticias.addEventListener('click', () => switchTab('noticias'));
-    el.tabPublicidad.addEventListener('click', () => switchTab('publicidad'));
-    el.tabCategorias.addEventListener('click', () => switchTab('categorias'));
-    el.tabConfig.addEventListener('click', () => {
+    el.tabInicio.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('inicio');
+    });
+    el.tabNoticias.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('noticias');
+    });
+    el.tabPublicidad.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('publicidad');
+    });
+    el.tabCategorias.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab('categorias');
+    });
+    el.tabConfig.addEventListener('click', (e) => {
+      e.preventDefault();
       abrirModal('modal-configuraciones');
     });
 
@@ -451,6 +464,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (width > height) {
               height = Math.round((height * maxDimension) / width);
               width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Exportar a WebP
+          const base64WebP = canvas.toDataURL('image/webp', 0.85);
+          resolve(base64WebP);
+        };
+        img.onerror = (err) => reject(err);
+        img.src = event.target.result;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
   // ==========================================
   // GESTIÓN DE PUBLICIDAD (CRUD)
   // ==========================================
