@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PEHUENIA ONLINE - Panel de Administración</title>
+  
+  <!-- FontAwesome para iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Estilos CSS -->
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- 1. Menú Lateral Izquierdo (Sidebar) -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <h2>PEHUENIA <span>ONLINE</span></h2>
+      <span class="admin-user">Hola, Pehuenia Online</span>
+    </div>
+    <ul class="sidebar-menu">
+      <li class="active" id="menu-inicio"><a href="#"><i class="fa-solid fa-house"></i> Inicio</a></li>
+      <li id="menu-noticias"><a href="#"><i class="fa-solid fa-newspaper"></i> Noticias</a></li>
+      <li id="menu-publicidad"><a href="#"><i class="fa-solid fa-rectangle-ad"></i> Publicidad</a></li>
+      <li id="menu-categorias"><a href="#"><i class="fa-solid fa-folder-tree"></i> Categorías</a></li>
+      <li id="menu-importer"><a href="importer.html"><i class="fa-solid fa-download"></i> Content Importer v3.3</a></li>
+      <li id="menu-config"><a href="#"><i class="fa-solid fa-gears"></i> SEO Config / Gemini</a></li>
+      <li><a href="/" target="_blank"><i class="fa-solid fa-globe"></i> Ver Web Pública</a></li>
+    </ul>
+  </aside>
+
+  <!-- 2. Contenedor de Contenido Principal -->
+  <div class="admin-container">
+    
+    <!-- Header superior -->
+    <header class="admin-header">
+      <div class="admin-header-title" id="page-title">Panel de Control</div>
+      <div class="admin-header-actions">
+        <div class="header-user-info">
+          <i class="fa-regular fa-bell"></i>
+          <span>Administrador</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Área de Trabajo -->
+    <main class="admin-main">
+
+      <!-- ==========================================
+           SECCIÓN: INICIO (DASHBOARD)
+           ========================================== -->
+      <div id="section-inicio" class="admin-tabactive">
+        
+        <!-- Tarjetas de Estadísticas superiores -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue">
+              <i class="fa-regular fa-file-lines"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-hoy">--</span>
+              <span class="stat-label">Noticias hoy</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange">
+              <i class="fa-solid fa-pen-fancy"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-borradores">--</span>
+              <span class="stat-label">Borradores</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="stat-visitas">--</span>
+              <span class="stat-label">Lecturas Totales</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel GESTIÓN RÁPIDA -->
+        <div class="admin-section">
+          <div class="section-title">Gestión Rápida</div>
+          <div class="quick-actions-grid">
+            <div class="action-card" id="btn-nueva-noticia-quick">
+              <i class="fa-solid fa-feather-alt action-icon"></i>
+              <h3>Nueva Noticia</h3>
+              <p>Redactar</p>
+            </div>
+            <div class="action-card" onclick="document.getElementById('menu-publicidad').click()">
+              <i class="fa-solid fa-rectangle-ad action-icon"></i>
+              <h3>Publicidad</h3>
+              <p>Banners</p>
+            </div>
+            <div class="action-card">
+              <i class="fa-solid fa-comments action-icon" style="color:var(--text-muted)"></i>
+              <h3 style="color:var(--text-muted)">Admin Chat</h3>
+              <p>Desactivado</p>
+            </div>
+            <div class="action-card" onclick="alert('Administrador único de Pehuenia Online')">
+              <i class="fa-solid fa-user-shield action-icon"></i>
+              <h3>Mi Cuenta</h3>
+              <p>Datos</p>
+            </div>
+            <div class="action-card" onclick="alert('Soporte Pehuenia Online: contacto@estudiosmax.com.ar')">
+              <i class="fa-solid fa-headset action-icon"></i>
+              <h3>Soporte</h3>
+              <p>Reportar</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel GOOGLE ANALYTICS -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Google Analytics</div>
+          </div>
+          <div class="analytics-content">
+            <div class="analytics-status">
+              <div class="status-dot" id="analytics-status-dot"></div>
+              <span id="analytics-status-text">Sin conectar</span>
+            </div>
+            <button class="btn btn-outline" id="btn-config-analytics">
+              <i class="fa-solid fa-plug"></i> Configurar Analytics
+            </button>
+          </div>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:10px;" id="analytics-id-display">Agrega tu ID de Analytics para ver estadísticas reales</p>
+        </div>
+
+      </div>
+
+      <!-- ==========================================
+           SECCIÓN: NOTICIAS (CRUD LIST)
+           ========================================== -->
+      <div id="section-noticias" style="display: none;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Noticias Publicadas y Borradores</div>
+            <button class="btn btn-primary" id="btn-nueva-noticia">
+              <i class="fa-solid fa-plus"></i> Redactar Nueva Noticia
+            </button>
+          </div>
+          <div class="table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Título</th>
+                  <th>Categoría</th>
+                  <th>Fecha</th>
+                  <th>Visitas</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="noticias-table-body">
+                <!-- Cargado con JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           SECCIÓN: PUBLICIDAD (CRUD LIST)
+           ========================================== -->
+      <div id="section-publicidad" style="display: none;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Campañas de Publicidad (Banners y Popups)</div>
+            <button class="btn btn-primary" id="btn-nueva-publicidad">
+              <i class="fa-solid fa-plus"></i> Crear Nueva Publicidad
+            </button>
+          </div>
+          <div class="table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre Anuncio</th>
+                  <th>Ubicación / Tipo</th>
+                  <th>Formato</th>
+                  <th>Enlace Destino</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="publicidad-table-body">
+                <!-- Cargado con JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================
+           SECCIÓN: CATEGORÍAS (LIST & CONFIG)
+           ========================================== -->
+      <div id="section-categorias" style="display: none;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Gestión de Categorías y Diseño del Inicio</div>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin: 0 20px 15px 20px;">
+            Configura el formato estético en el que se verá cada categoría dentro de la página principal del diario y la cantidad de artículos mostrados.
+          </p>
+          <div class="table-wrapper">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Categoría</th>
+                  <th>Identificador (Slug)</th>
+                  <th>Diseño en Inicio</th>
+                  <th>Límite Noticias</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="categorias-table-body">
+                <!-- Cargado con JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ==========================================
+       MODAL: REDACTAR / EDITAR NOTICIA
+       ========================================== -->
+  <div class="modal" id="modal-noticia">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-noticia-title">Redactar Noticia</h3>
+        <button class="btn btn-outline" style="border:none" onclick="cerrarModal('modal-noticia')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-noticia">
+          <input type="hidden" id="noticia-id">
+          <div class="form-group">
+            <label for="noticia-titulo">Título de la Noticia</label>
+            <input type="text" id="noticia-titulo" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="noticia-copete">Copete / Resumen Corto</label>
+            <input type="text" id="noticia-copete" class="form-control" placeholder="Opcional. Resumen de una frase">
+          </div>
+          <div class="form-group">
+            <label for="noticia-categoria">Categoría</label>
+            <select id="noticia-categoria" class="form-control" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="noticia-imagen">URL de la Imagen Destacada / Portada</label>
+            <input type="url" id="noticia-imagen" class="form-control" placeholder="Se completará automáticamente al subir una imagen o puedes poner un enlace">
+          </div>
+          <div class="form-group" style="background-color:var(--admin-bg-main); padding:16px; border-radius:var(--border-radius); border:1px solid var(--border-color);">
+            <label for="noticia-archivos" style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-cloud-arrow-up" style="color:var(--color-primary);"></i> Subir Imágenes locales</label>
+            <input type="file" id="noticia-archivos" class="form-control" accept="image/*" multiple style="margin-top:8px;">
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:6px;">
+              Optimiza y convierte tus fotos a WebP automáticamente. Si subes 2 o más, la <strong>primera</strong> se usará como portada y las demás se añadirán al final del contenido.
+            </p>
+            <div id="previsualizacion-imagenes" style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;"></div>
+          </div>
+          <div class="form-group">
+            <label for="noticia-autor">Autor</label>
+            <input type="text" id="noticia-autor" class="form-control" value="Redacción Pehuenia Online">
+          </div>
+          <div class="form-group">
+            <label for="noticia-contenido">Desarrollo de la Noticia (HTML/Texto)</label>
+            <textarea id="noticia-contenido" class="form-control" rows="8" required style="resize:none"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="noticia-estado">Estado de Publicación</label>
+            <select id="noticia-estado" class="form-control" required>
+              <option value="borrador">Borrador</option>
+              <option value="publicado">Publicado</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cerrarModal('modal-noticia')">Cancelar</button>
+        <button class="btn btn-success" id="btn-guardar-noticia">Guardar Noticia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CONFIGURACIONES (SEO, ANALYTICS Y GEMINI)
+       ========================================== -->
+  <div class="modal" id="modal-configuraciones">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Configuración General y API</h3>
+        <button class="btn btn-outline" style="border:none" onclick="cerrarModal('modal-configuraciones')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-configuraciones">
+          <div class="form-group">
+            <label for="config-gemini-key">Clave de API de Google Gemini</label>
+            <input type="password" id="config-gemini-key" class="form-control" placeholder="Clave para reformular noticias automáticamente">
+            <p style="font-size:0.7rem; color:var(--text-muted)">Se utiliza en el módulo de auto-importación para reescribir noticias y evitar alucinaciones.</p>
+          </div>
+          <div class="form-group">
+            <label for="config-analytics-id">ID de Medición de Google Analytics (G-XXXXXXX)</label>
+            <input type="text" id="config-analytics-id" class="form-control" placeholder="G-5ZGL0WLWZS">
+          </div>
+          <div class="form-group">
+            <label for="config-nombre-diario">Nombre del Periódico</label>
+            <input type="text" id="config-nombre-diario" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="config-clima-ciudad">Ciudad del Clima</label>
+            <input type="text" id="config-clima-ciudad" class="form-control">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cerrarModal('modal-configuraciones')">Cancelar</button>
+        <button class="btn btn-primary" id="btn-guardar-configuraciones">Guardar Configuración</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CREAR / EDITAR PUBLICIDAD
+       ========================================== -->
+  <div class="modal" id="modal-publicidad">
+    <div class="modal-content" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 id="modal-publicidad-title">Crear Publicidad</h3>
+        <button class="btn btn-outline" style="border:none" onclick="cerrarModal('modal-publicidad')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-publicidad">
+          <input type="hidden" id="pub-id">
+          
+          <div class="form-group">
+            <label for="pub-nombre">Nombre de la Campaña Publicitaria</label>
+            <input type="text" id="pub-nombre" class="form-control" placeholder="Ej: Banner Hotel Pehuenia" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label for="pub-tipo">Posición y Tamaño</label>
+              <select id="pub-tipo" class="form-control" required>
+                <option value="banner_1200x200">Banner Superior 1200x200</option>
+                <option value="banner_1200x100">Banner Superior Fino 1200x100</option>
+                <option value="banner_700x200">Banner Intermedio Grande 700x200</option>
+                <option value="banner_700x100">Banner Intermedio Fino 700x100</option>
+                <option value="banner_300x300">Banner Lateral 300x300</option>
+                <option value="popup">Popup Flotante de Bienvenida</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="pub-formato">Formato Multimedia</label>
+              <select id="pub-formato" class="form-control" required>
+                <option value="imagen">Imagen (JPG, PNG, WebP)</option>
+                <option value="gif">GIF Animado</option>
+                <option value="video">Video (MP4, WebM)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="background-color:var(--admin-bg-main); padding:16px; border-radius:var(--border-radius); border:1px solid var(--border-color);">
+            <label for="pub-archivo-input" style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-cloud-arrow-up" style="color:var(--color-primary);"></i> Cargar Archivo Anuncio</label>
+            <input type="file" id="pub-archivo-input" class="form-control" style="margin-top:8px;">
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:6px;">
+              Sube la imagen, GIF o video para tu publicidad. Se optimizará y guardará de manera segura.
+            </p>
+            <div id="previsualizacion-pub" style="margin-top:10px; text-align:center;"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="pub-url-archivo">O ingresar URL del Archivo</label>
+            <input type="url" id="pub-url-archivo" class="form-control" placeholder="http://servidor.com/anuncio.gif">
+          </div>
+
+          <div class="form-group">
+            <label for="pub-url-destino">Enlace de Destino (Web / WhatsApp)</label>
+            <input type="url" id="pub-url-destino" class="form-control" placeholder="https://wa.me/5492942000000 o https://sitio.com" required>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Se abrirá automáticamente en una nueva pestaña (target="_blank") para no sacar al lector del diario.</p>
+          </div>
+
+          <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+            <input type="checkbox" id="pub-activo" style="width:18px; height:18px; cursor:pointer;" checked>
+            <label for="pub-activo" style="font-size:0.85rem; font-weight:600; cursor:pointer;">Anuncio Activo y Visible</label>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cerrarModal('modal-publicidad')">Cancelar</button>
+        <button class="btn btn-success" id="btn-guardar-publicidad">Guardar Anuncio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CONFIGURAR DISEÑO CATEGORÍA
+       ========================================== -->
+  <div class="modal" id="modal-categoria-config">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>Configurar Categoría en Inicio</h3>
+        <button class="btn btn-outline" style="border:none" onclick="cerrarModal('modal-categoria-config')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-categoria-config">
+          <input type="hidden" id="cat-config-id">
+          
+          <div class="form-group">
+            <label>Nombre de la Categoría</label>
+            <input type="text" id="cat-config-nombre" class="form-control" disabled>
+          </div>
+
+          <div class="form-group">
+            <label for="cat-config-diseno">Formato / Diseño en el Inicio</label>
+            <select id="cat-config-diseno" class="form-control" required>
+              <option value="grid">1. Grilla de Tarjetas (3 Columnas)</option>
+              <option value="carousel">2. Carrusel Horizontal Desplizable</option>
+              <option value="list">3. Lista Compacta Vertical</option>
+              <option value="featured">4. Nota Destacada + Lista Lateral</option>
+              <option value="mosaic">5. Mosaico Asimétrico Premium</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cat-config-limite">Cantidad de Noticias a Mostrar</label>
+            <input type="number" id="cat-config-limite" class="form-control" min="1" max="15" value="3" required>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Define el número máximo de artículos de esta categoría en la portada.</p>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cerrarModal('modal-categoria-config')">Cancelar</button>
+        <button class="btn btn-success" id="btn-guardar-categoria-config">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts JS -->
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PEHUENIA ONLINE - Noticias de Villa Pehuenia y Moquehue</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Diario digital de Villa Pehuenia y Moquehue. Noticias locales, provinciales, nacionales, deportes, clima e información turística.">
+  <meta name="robots" content="index, follow">
+  
+  <!-- Google Fonts: Playfair Display para títulos, Outfit para el cuerpo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome para iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Estilos CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="light-theme">
+
+  <!-- 1. Ticker de Noticias Pasantes (Breaking News) -->
+  <div class="ticker-wrapper" id="breaking-ticker-container">
+    <div class="ticker-label">ÚLTIMAS NOTICIAS</div>
+    <div class="ticker-content">
+      <div class="ticker-track" id="breaking-ticker-track">
+        <span>Cargando noticias de última hora...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Cabecera (Header) -->
+  <header class="main-header">
+    <div class="header-container">
+      <div class="header-left">
+        <span class="header-date" id="current-date">Cargando fecha...</span>
+      </div>
+      
+      <div class="header-center">
+        <a href="index.html" class="logo-link">
+          <span class="logo-sub">NOTICIAS DE VILLA PEHUENIA MOQUEHUE</span>
+          <h1 class="logo-title">PEHUENIA<span>ONLINE</span></h1>
+        </a>
+      </div>
+      
+      <div class="header-right">
+        <!-- Widget del Clima -->
+        <div class="weather-widget" id="weather-widget">
+          <i class="fa-solid fa-cloud-sun weather-icon"></i>
+          <div class="weather-info">
+            <span class="weather-temp" id="weather-temp">--°C</span>
+            <span class="weather-hum" id="weather-hum">Humedad: --%</span>
+          </div>
+        </div>
+        
+        <!-- Selector de Tema (Claro/Oscuro) -->
+        <button class="theme-toggle" id="theme-toggle" aria-label="Cambiar tema">
+          <i class="fa-regular fa-moon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3. Navegación Principal -->
+  <nav class="main-nav">
+    <div class="nav-container">
+      <button class="menu-mobile-toggle" id="mobile-toggle" aria-label="Abrir menú">
+        <i class="fa-solid fa-bars"></i> Menú
+      </button>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#" class="active" data-category="home">Inicio</a></li>
+        <li class="dropdown">
+          <a href="#" class="dropdown-trigger">Noticias <i class="fa-solid fa-chevron-down"></i></a>
+          <ul class="dropdown-menu">
+            <li><a href="#" data-category="provinciales">Locales y Provinciales</a></li>
+            <li><a href="#" data-category="nacionales">Nacionales</a></li>
+            <li><a href="#" data-category="internacionales">Internacionales</a></li>
+            <li><a href="#" data-category="deportes">Deportes</a></li>
+            <li><a href="#" data-category="policiales">Policiales</a></li>
+            <li><a href="#" data-category="economia">Economía</a></li>
+            <li><a href="#" data-category="politica">Política</a></li>
+          </ul>
+        </li>
+        <li class="dropdown">
+          <a href="#" class="dropdown-trigger">Interesante <i class="fa-solid fa-chevron-down"></i></a>
+          <ul class="dropdown-menu">
+            <li><a href="#" data-category="entretenimiento-y-curiosidades">Entretenimiento y Curiosidades</a></li>
+            <li><a href="#" data-category="tecnologia">Tecnología</a></li>
+            <li><a href="#" data-category="mascotas">Mascotas</a></li>
+          </ul>
+        </li>
+        <li><a href="#" data-category="guias-de-servicios-y-reservas">Servicios y Reservas</a></li>
+        <li><a href="#" data-category="quienes-somos">Quiénes Somos</a></li>
+        <li><a href="#" data-category="contacto">Contacto</a></li>
+      </ul>
+      <div class="nav-search">
+        <input type="text" id="search-input" placeholder="Buscar noticia...">
+        <button id="search-button" aria-label="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Espacio para Banner Superior (1200x100 / 1200x200) -->
+  <div id="ad-top-banner" class="ad-banner-1200x100" style="display:none;"></div>
+
+  <!-- 4. Contenido Principal -->
+  <main class="main-content">
+    
+    <!-- Sección Home (Se muestra al inicio) -->
+    <section id="section-home" class="page-section active">
+      
+      <!-- HERO: Grilla Asimétrica y Móvil de Últimas Noticias -->
+      <div class="hero-grid-wrapper">
+        <div class="hero-grid" id="hero-grid">
+          <!-- Se inyecta dinámicamente con JavaScript -->
+          <div class="shimmer-placeholder hero-large-shimmer"></div>
+          <div class="shimmer-placeholder hero-medium-shimmer"></div>
+          <div class="shimmer-placeholder hero-small-shimmer-1"></div>
+          <div class="shimmer-placeholder hero-small-shimmer-2"></div>
+        </div>
+      </div>
+
+      <!-- Layout Principal en 4 Columnas (Debajo del Hero) -->
+      <div class="home-four-col-layout">
+        
+        <!-- Área Izquierda (3 columnas): Categorías Dinámicas y Anuncios de Relleno -->
+        <div class="home-left-categories" id="dynamic-home-categories">
+          <!-- Cargado dinámicamente con JavaScript -->
+        </div>
+
+        <!-- Área Derecha (1 columna): Barra Lateral Inamovible -->
+        <aside class="home-right-sidebar">
+          
+          <!-- Widget: Radios En Vivo -->
+          <div class="sidebar-widget audio-player-widget">
+            <h3 class="widget-title"><i class="fa-solid fa-radio"></i> Radios en Vivo</h3>
+            <div id="audio-streams-container">
+              <!-- Inyectado dinámicamente -->
+            </div>
+          </div>
+          
+          <!-- Publicidad 300x300 (Posición 1) -->
+          <div id="ad-sidebar-banner-1" class="ad-banner-300x300" style="display:none;"></div>
+
+          <!-- Widget: Categoría Lateral Policiales -->
+          <div class="sidebar-widget compact-category-widget" id="sidebar-policiales-category" style="display:none;">
+            <!-- Cargado dinámicamente -->
+          </div>
+
+          <!-- Widget: Clima Semanal -->
+          <div class="sidebar-widget weather-weekly-widget">
+            <h3 class="widget-title"><i class="fa-solid fa-calendar-days"></i> Clima Semanal</h3>
+            <div id="weather-weekly-container">
+              <!-- Cargado dinámicamente -->
+            </div>
+          </div>
+
+          <!-- Widget: Mercados / Cotizaciones -->
+          <div class="sidebar-widget inline-rates-widget">
+            <h3 class="widget-title"><i class="fa-solid fa-chart-line"></i> Mercados</h3>
+            <div class="rates-grid">
+              <div class="rate-item">
+                <span class="rate-name">Dólar Oficial</span>
+                <span class="rate-value" id="rate-dolar-oficial">$--</span>
+              </div>
+              <div class="rate-item">
+                <span class="rate-name">Dólar Blue</span>
+                <span class="rate-value" id="rate-dolar-blue">$--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Widget: Categoría Lateral Curiosidades -->
+          <div class="sidebar-widget compact-category-widget" id="sidebar-curiosidades-category" style="display:none;">
+            <!-- Cargado dinámicamente -->
+          </div>
+
+          <!-- Widget: Fixture Mundial -->
+          <div class="sidebar-widget fixture-widget">
+            <h3 class="widget-title"><i class="fa-solid fa-trophy"></i> Fixture Mundial</h3>
+            <div id="fixture-container">
+              <!-- Cargado dinámicamente -->
+            </div>
+          </div>
+
+          <!-- Widget: Categoría Lateral Compacta (ej. Mascotas) -->
+          <div class="sidebar-widget compact-category-widget" id="sidebar-compact-category" style="display:none;">
+            <!-- Cargado dinámicamente -->
+          </div>
+
+          <!-- Publicidad 300x300 (Posición 2) -->
+          <div id="ad-sidebar-banner-2" class="ad-banner-300x300" style="display:none;"></div>
+
+          <!-- Widget: Opinión / Editorial -->
+          <div class="sidebar-widget">
+            <h3 class="widget-title"><i class="fa-solid fa-quote-left"></i> Editorial</h3>
+            <div class="editorial-card">
+              <span class="editorial-tag">OPINIÓN</span>
+              <h4 class="editorial-headline">El desarrollo sustentable en la cordillera</h4>
+              <p class="editorial-excerpt">Una mirada reflexiva sobre el crecimiento edilicio y turístico en nuestra querida Villa Pehuenia...</p>
+              <span class="editorial-author">Por Redacción</span>
+            </div>
+          </div>
+          
+        </aside>
+
+      </div>
+    </section>
+
+    <!-- Sección de Categoría Genérica (Se activa al hacer click en el menú) -->
+    <section id="section-category" class="page-section">
+      <div class="category-header-banner">
+        <h2 class="category-page-title" id="category-page-title">Categoría</h2>
+      </div>
+      <div class="category-layout">
+        <div class="posts-grid-category" id="grid-category-posts">
+          <!-- Se inyecta dinámicamente -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección de Detalle de Noticia -->
+    <section id="section-detail" class="page-section">
+      <article class="article-detail" id="article-detail-content">
+        <!-- Inyectado dinámicamente -->
+      </article>
+    </section>
+
+  </main>
+
+  <!-- 5. Pie de Página (Footer) -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-about">
+        <h2 class="footer-logo">PEHUENIA<span>ONLINE</span></h2>
+        <p>Diario digital con noticias actualizadas de Villa Pehuenia y Moquehue, provincia del Neuquén, Argentina.</p>
+        <div class="social-links">
+          <a href="https://www.facebook.com/" target="_blank"><i class="fa-brands fa-facebook"></i></a>
+          <a href="https://www.instagram.com/" target="_blank"><i class="fa-brands fa-instagram"></i></a>
+          <a href="https://api.whatsapp.com/" target="_blank"><i class="fa-brands fa-whatsapp"></i></a>
+          <a href="https://youtube.com/" target="_blank"><i class="fa-brands fa-youtube"></i></a>
+        </div>
+      </div>
+      
+      <div class="footer-links-grid">
+        <div class="footer-nav-col">
+          <h4>Secciones</h4>
+          <ul>
+            <li><a href="#" data-category="provinciales">Locales</a></li>
+            <li><a href="#" data-category="deportes">Deportes</a></li>
+            <li><a href="#" data-category="economia">Economía</a></li>
+            <li><a href="#" data-category="politica">Política</a></li>
+          </ul>
+        </div>
+        <div class="footer-nav-col">
+          <h4>Servicios</h4>
+          <ul>
+            <li><a href="#" data-category="guias-de-servicios-y-reservas">Turismo y Reservas</a></li>
+            <li><a href="#" data-category="quienes-somos">Quiénes Somos</a></li>
+            <li><a href="#" data-category="contacto">Contacto</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-newsletter">
+        <h4>Newsletter</h4>
+        <p>Recibe los titulares más importantes de la cordillera en tu correo.</p>
+        <form class="newsletter-form" id="newsletter-form">
+          <input type="email" placeholder="Tu correo electrónico" required>
+          <button type="submit">Suscribir</button>
+        </form>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 Pehuenia Online. Todos los derechos reservados. Desarrollado con estilo impecable.</p>
+    </div>
+  </footer>
+
+  <!-- Modal Popup de Publicidad -->
+  <div class="ad-popup-overlay" id="ad-popup-overlay">
+    <div class="ad-popup-container">
+      <button class="ad-popup-close" id="ad-popup-close"><i class="fa-solid fa-xmark"></i></button>
+      <div class="ad-popup-body" id="ad-popup-body">
+        <!-- Inyectado dinámicamente -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts JS -->
+  <script src="js/main.js"></script>
+</body>
+</html>

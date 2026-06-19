@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PEHUENIA ONLINE - Content Importer v3.3</title>
+  
+  <!-- FontAwesome para iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Estilos CSS -->
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- 1. Menú Lateral Izquierdo (Sidebar) -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-brand">
+      <h2>PEHUENIA <span>ONLINE</span></h2>
+      <span class="admin-user">Hola, Pehuenia Online</span>
+    </div>
+    <ul class="sidebar-menu">
+      <li id="menu-inicio"><a href="index.html"><i class="fa-solid fa-house"></i> Inicio</a></li>
+      <li id="menu-noticias"><a href="index.html?tab=noticias"><i class="fa-solid fa-newspaper"></i> Noticias</a></li>
+      <li class="active" id="menu-importer"><a href="#"><i class="fa-solid fa-download"></i> Content Importer v3.3</a></li>
+      <li id="menu-config"><a href="index.html?tab=config"><i class="fa-solid fa-gears"></i> SEO Config / Gemini</a></li>
+      <li><a href="/" target="_blank"><i class="fa-solid fa-globe"></i> Ver Web Pública</a></li>
+    </ul>
+  </aside>
+
+  <!-- 2. Contenedor de Contenido Principal -->
+  <div class="admin-container">
+    
+    <!-- Header superior -->
+    <header class="admin-header">
+      <div class="admin-header-title">Content Importer v3.3</div>
+      <div class="admin-header-actions">
+        <div class="header-user-info">
+          <i class="fa-solid fa-robot"></i>
+          <span>Auto-Blogging Activo</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Área de Trabajo -->
+    <main class="admin-main">
+
+      <!-- Contenedor Principal de Campañas -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title"><i class="fa-solid fa-list-check"></i> Campañas de Auto-Importación RSS</div>
+          <button class="btn btn-primary" id="btn-nueva-campana">
+            <i class="fa-solid fa-plus"></i> Agregar Nueva Campaña
+          </button>
+        </div>
+        
+        <div class="table-wrapper">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Nombre de la Campaña</th>
+                <th>Feed RSS</th>
+                <th>Categoría Destino</th>
+                <th>Publicación por Defecto</th>
+                <th>Frecuencia</th>
+                <th>IA Auto-Reformular</th>
+                <th>Última Ejecución</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="campanas-table-body">
+              <!-- Cargado con JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ==========================================
+       MODAL: CREAR / EDITAR CAMPAÑA (WPeMatico-style)
+       ========================================== -->
+  <div class="modal" id="modal-campana">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="modal-campana-title">Editar Campaña</h3>
+        <button class="btn btn-outline" style="border:none" onclick="cerrarModal('modal-campana')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-campana">
+          <input type="hidden" id="campana-id">
+          
+          <div class="form-group">
+            <label for="campana-nombre">Nombre de la Campaña</label>
+            <input type="text" id="campana-nombre" class="form-control" placeholder="Ej: Deportes Feed" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="campana-feed">URL del Feed RSS / Canal</label>
+            <input type="url" id="campana-feed" class="form-control" placeholder="http://servidor.com/deportes/feed/" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label for="campana-categoria">Categoría de Destino</label>
+              <select id="campana-categoria" class="form-control" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="campana-limite">Límite de Noticias por Ejecución</label>
+              <input type="number" id="campana-limite" class="form-control" value="5" min="1" max="20" required>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label for="campana-frecuencia">Frecuencia de Importación</label>
+              <select id="campana-frecuencia" class="form-control" required>
+                <option value="15">Cada 15 minutos</option>
+                <option value="30">Cada 30 minutos</option>
+                <option value="60" selected>Cada 1 hora</option>
+                <option value="120">Cada 2 horas</option>
+                <option value="240">Cada 4 horas</option>
+                <option value="360">Cada 6 horas</option>
+                <option value="720">Cada 12 horas</option>
+                <option value="1440">Cada 24 horas</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="campana-estado">Estado de la Campaña</label>
+              <select id="campana-estado" class="form-control" required>
+                <option value="activa">Activa</option>
+                <option value="pausada">Pausada</option>
+              </select>
+            </div>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--border-color); margin: 16px 0;">
+
+          <!-- Configuración del Comportamiento (WPeMatico/Gemini) -->
+          <div style="display: flex; flex-direction: column; gap: 12px; background-color: var(--admin-bg-main); padding: 16px; border-radius: var(--border-radius)">
+            <h4 style="font-size: 0.8rem; font-weight: 700; margin-bottom: 4px;">Comportamiento e Inteligencia Artificial</h4>
+            
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="checkbox" id="campana-auto-reformular" style="width: 16px; height: 16px; cursor: pointer;">
+              <label for="campana-auto-reformular" style="font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+                Reformular Noticias con IA (Google Gemini)
+              </label>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); padding-left: 26px; margin-top: -6px;">
+              Reescribe los títulos y el cuerpo utilizando IA de forma estricta (prohibido inventar datos).
+            </p>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+              <input type="checkbox" id="campana-auto-publicar" style="width: 16px; height: 16px; cursor: pointer;">
+              <label for="campana-auto-publicar" style="font-size: 0.8rem; font-weight: 600; cursor: pointer;">
+                Publicar Directamente al Importar
+              </label>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); padding-left: 26px; margin-top: -6px;">
+              Si se desmarca, se guardará en <strong>Borrador</strong> para poder revisarla, corregirla y publicarla manualmente. (Recomendado para pruebas).
+            </p>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cerrarModal('modal-campana')">Cancelar</button>
+        <button class="btn btn-success" id="btn-guardar-campana">Guardar Campaña</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts JS -->
+  <script src="importer.js"></script>
+</body>
+</html>
