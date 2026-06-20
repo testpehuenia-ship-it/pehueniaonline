@@ -506,7 +506,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const badgeClass = pub.activo === 1 ? 'badge-published' : 'badge-draft';
         const badgeLabel = pub.activo === 1 ? 'Activo' : 'Inactivo';
         
-        const tipoLabel = pub.tipo.replace('banner_', 'Banner ').replace('popup', 'Popup Flotante');
+        let tipoLabel = pub.tipo;
+        if (pub.tipo === 'P-Superior') tipoLabel = 'P-Superior (Banner Superior Grande 1200x200)';
+        else if (pub.tipo === 'P-Superior-Fino') tipoLabel = 'P-Superior Fino (Banner Superior Fino 1200x100)';
+        else if (pub.tipo === 'P-Middle') tipoLabel = 'P-Middle (Banner Intermedio Grande 700x200)';
+        else if (pub.tipo === 'P-Middle-Fino') tipoLabel = 'P-Middle Fino (Banner Intermedio Fino 700x100)';
+        else if (pub.tipo === 'P1') tipoLabel = 'P1 (Lateral Izquierdo Central 300x300)';
+        else if (pub.tipo === 'P2') tipoLabel = 'P2 (Lateral Izquierdo Inferior 300x300)';
+        else if (pub.tipo === 'P3') tipoLabel = 'P3 (Barra Lateral Superior 300x300)';
+        else if (pub.tipo === 'P4') tipoLabel = 'P4 (Barra Lateral Inferior 300x300)';
+        else if (pub.tipo === 'popup') tipoLabel = 'Popup de Bienvenida';
+        else tipoLabel = pub.tipo.replace('banner_', 'Banner ').replace('popup', 'Popup Flotante');
 
         tr.innerHTML = `
           <td style="font-weight:600">${pub.nombre}</td>

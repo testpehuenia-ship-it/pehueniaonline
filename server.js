@@ -638,7 +638,7 @@ try {
 }
 
 // Endpoint para subir imagen (base64 WebP)
-app.post('/api/admin/subir-imagen', (req, res) => {
+app.post('/api/admin/subir-imagen', async (req, res) => {
   const { imagenBase64 } = req.body;
   if (!imagenBase64) {
     return res.status(400).json({ error: 'No se recibió ninguna imagen base64' });
@@ -651,8 +651,51 @@ app.post('/api/admin/subir-imagen', (req, res) => {
       return res.status(400).json({ error: 'Formato base64 inválido' });
     }
 
+    const mimeType = matches[1];
     const buffer = Buffer.from(matches[2], 'base64');
-    const uniqueName = `img_${Date.now()}_${Math.round(Math.random() * 1000)}.webp`;
+
+    // Determinar extensión basándose en el mimeType
+    let ext = 'webp';
+    if (mimeType.includes('png')) ext = 'png';
+    else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
+    else if (mimeType.includes('gif')) ext = 'gif';
+
+    // SI ESTAMOS EN VERCEL O PRODUCCIÓN: Subir a Catbox para evitar limitaciones de solo lectura y temporalidad
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+      const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
+      const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="upload_${Date.now()}.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+
+      const multipartBody = Buffer.concat([
+        Buffer.from(header1, 'utf-8'),
+        Buffer.from(header2, 'utf-8'),
+        buffer,
+        Buffer.from(footer, 'utf-8')
+      ]);
+
+      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`
+        },
+        body: multipartBody
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Catbox subida falló: ${uploadRes.statusText}`);
+      }
+
+      const fileUrl = await uploadRes.text();
+      if (fileUrl && fileUrl.startsWith('http')) {
+        return res.json({ url: fileUrl.trim() });
+      } else {
+        throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+      }
+    }
+
+    // DESARROLLO LOCAL: Guardar en el sistema de archivos local
+    const uniqueName = `img_${Date.now()}_${Math.round(Math.random() * 1000)}.${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
 
     fs.writeFileSync(filePath, buffer);
@@ -664,26 +707,23 @@ app.post('/api/admin/subir-imagen', (req, res) => {
   }
 });
 
+
 // --- APIs de Publicidades ---
 
 // Funciones auxiliares para sincronización de publicidades en la nube
-async function syncPublicidadesToCloud() {
-  db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
-    if (!err && rows) {
-      try {
-        const val = Buffer.from(JSON.stringify(rows)).toString('hex');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-        await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/publicidades_config/${val}`, {
-          method: 'POST',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-      } catch (e) {
-        console.error('Error al sincronizar publicidades con la nube:', e.message);
-      }
-    }
-  });
+async function savePublicidadesToCloud(ads) {
+  try {
+    const val = Buffer.from(JSON.stringify(ads)).toString('hex');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/publicidades_config/${val}`, {
+      method: 'POST',
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+  } catch (e) {
+    console.error('Error al guardar publicidades en la nube:', e.message);
+  }
 }
 
 async function getPublicidadesFromCloud(sqliteRows) {
@@ -733,38 +773,102 @@ app.get('/api/admin/publicidades', (req, res) => {
 // Crear publicidad
 app.post('/api/admin/publicidades', (req, res) => {
   const { nombre, tipo, formato, url_archivo, url_destino, activo } = req.body;
-  db.run(`
-    INSERT INTO publicidades (nombre, tipo, formato, url_archivo, url_destino, activo)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `, [nombre, tipo, formato, url_archivo, url_destino, activo], function(err) {
+  
+  db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    syncPublicidadesToCloud();
-    res.json({ id: this.lastID, message: 'Publicidad creada con éxito' });
+    
+    let currentAds = await getPublicidadesFromCloud(rows);
+    const newId = currentAds.length > 0 ? Math.max(...currentAds.map(a => a.id)) + 1 : 1;
+    
+    const newAd = {
+      id: newId,
+      nombre,
+      tipo,
+      formato,
+      url_archivo,
+      url_destino,
+      activo: parseInt(activo, 10) || 0
+    };
+    
+    currentAds.unshift(newAd); // Agregar al inicio
+    
+    // Guardar en la nube
+    await savePublicidadesToCloud(currentAds);
+    
+    // Guardar localmente
+    db.run(`
+      INSERT INTO publicidades (id, nombre, tipo, formato, url_archivo, url_destino, activo)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [newId, nombre, tipo, formato, url_archivo, url_destino, activo], function(dbErr) {
+      res.json({ id: newId, message: 'Publicidad creada con éxito' });
+    });
   });
 });
 
 // Actualizar publicidad
 app.put('/api/admin/publicidades/:id', (req, res) => {
-  const id = req.params.id;
+  const id = parseInt(req.params.id, 10);
   const { nombre, tipo, formato, url_archivo, url_destino, activo } = req.body;
-  db.run(`
-    UPDATE publicidades
-    SET nombre = ?, tipo = ?, formato = ?, url_archivo = ?, url_destino = ?, activo = ?
-    WHERE id = ?
-  `, [nombre, tipo, formato, url_archivo, url_destino, activo, id], (err) => {
+  
+  db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    syncPublicidadesToCloud();
-    res.json({ message: 'Publicidad actualizada con éxito' });
+    
+    let currentAds = await getPublicidadesFromCloud(rows);
+    
+    let adIndex = currentAds.findIndex(a => a.id === id);
+    if (adIndex !== -1) {
+      currentAds[adIndex] = {
+        id,
+        nombre,
+        tipo,
+        formato,
+        url_archivo,
+        url_destino,
+        activo: parseInt(activo, 10) || 0
+      };
+    } else {
+      currentAds.unshift({
+        id,
+        nombre,
+        tipo,
+        formato,
+        url_archivo,
+        url_destino,
+        activo: parseInt(activo, 10) || 0
+      });
+    }
+    
+    // Guardar en la nube
+    await savePublicidadesToCloud(currentAds);
+    
+    // Actualizar localmente
+    db.run(`
+      UPDATE publicidades
+      SET nombre = ?, tipo = ?, formato = ?, url_archivo = ?, url_destino = ?, activo = ?
+      WHERE id = ?
+    `, [nombre, tipo, formato, url_archivo, url_destino, activo, id], (dbErr) => {
+      res.json({ message: 'Publicidad actualizada con éxito' });
+    });
   });
 });
 
 // Eliminar publicidad
 app.delete('/api/admin/publicidades/:id', (req, res) => {
-  const id = req.params.id;
-  db.run('DELETE FROM publicidades WHERE id = ?', [id], (err) => {
+  const id = parseInt(req.params.id, 10);
+  
+  db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    syncPublicidadesToCloud();
-    res.json({ message: 'Publicidad eliminada con éxito' });
+    
+    let currentAds = await getPublicidadesFromCloud(rows);
+    currentAds = currentAds.filter(a => a.id !== id);
+    
+    // Guardar en la nube
+    await savePublicidadesToCloud(currentAds);
+    
+    // Borrar localmente
+    db.run('DELETE FROM publicidades WHERE id = ?', [id], (dbErr) => {
+      res.json({ message: 'Publicidad eliminada con éxito' });
+    });
   });
 });
 
@@ -775,40 +879,61 @@ app.put('/api/admin/categorias/:id', (req, res) => {
   const id = req.params.id;
   const { diseno_home, limite_home } = req.body;
   
-  db.run(`
-    UPDATE categorias
-    SET diseno_home = ?, limite_home = ?
-    WHERE id = ?
-  `, [diseno_home, limite_home, id], (err) => {
+  db.get('SELECT slug FROM categorias WHERE id = ?', [id], async (err, categoryRow) => {
     if (err) return res.status(500).json({ error: err.message });
+    if (!categoryRow) return res.status(404).json({ error: 'Categoría no encontrada' });
 
-    // Sincronizar todo el mapa de configuraciones de categorías con la nube
-    db.all('SELECT slug, diseno_home, limite_home FROM categorias', async (selectErr, rows) => {
-      if (!selectErr && rows) {
-        try {
-          const config = {};
-          rows.forEach(row => {
-            config[row.slug] = {
-              diseno_home: row.diseno_home,
-              limite_home: row.limite_home
-            };
-          });
+    const slug = categoryRow.slug;
 
-          const val = Buffer.from(JSON.stringify(config)).toString('hex');
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-
-          await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/categorias_config/${val}`, {
-            method: 'POST',
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-        } catch (e) {
-          console.error('Error al subir configuraciones de categorías a la nube:', e.message);
+    // 1. Obtener la config actual de la nube
+    let cloudConfig = {};
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const kvRes = await fetch('https://keyvalue.immanuel.co/api/KeyVal/GetValue/nwoxgbkq/categorias_config', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (kvRes.ok) {
+        const text = await kvRes.text();
+        if (text) {
+          const hexClean = text.replace(/"/g, '').trim();
+          if (hexClean) {
+            const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
+            cloudConfig = JSON.parse(decodedString);
+          }
         }
       }
-      
-      // Retornar éxito inmediatamente para no bloquear el cliente
+    } catch (e) {
+      console.error('Error al recuperar config actual de la nube:', e.message);
+    }
+
+    // 2. Modificar solo la categoría que estamos actualizando
+    cloudConfig[slug] = {
+      diseno_home,
+      limite_home: parseInt(limite_home, 10) || 3
+    };
+
+    // 3. Guardar de vuelta en la nube
+    try {
+      const val = Buffer.from(JSON.stringify(cloudConfig)).toString('hex');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/categorias_config/${val}`, {
+        method: 'POST',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (e) {
+      console.error('Error al subir configuraciones de categorías a la nube:', e.message);
+    }
+
+    // También actualizar localmente por si acaso (para desarrollo local)
+    db.run(`
+      UPDATE categorias
+      SET diseno_home = ?, limite_home = ?
+      WHERE id = ?
+    `, [diseno_home, limite_home, id], (updateErr) => {
       res.json({ message: 'Diseño de categoría actualizado con éxito' });
     });
   });
@@ -848,15 +973,24 @@ app.post('/api/admin/subir-archivo', async (req, res) => {
 
     // SI ESTAMOS EN VERCEL O PRODUCCIÓN: Subir a Catbox para evitar limitaciones de solo lectura y temporalidad
     if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-      const formData = new FormData();
-      formData.append('reqtype', 'fileupload');
-      
-      const blob = new Blob([buffer], { type: mimeType });
-      formData.append('fileToUpload', blob, `upload_${Date.now()}.${ext}`);
+      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+      const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
+      const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="upload_${Date.now()}.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+      const footer = `\r\n--${boundary}--\r\n`;
+
+      const multipartBody = Buffer.concat([
+        Buffer.from(header1, 'utf-8'),
+        Buffer.from(header2, 'utf-8'),
+        buffer,
+        Buffer.from(footer, 'utf-8')
+      ]);
 
       const uploadRes = await fetch('https://catbox.moe/user/api.php', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`
+        },
+        body: multipartBody
       });
 
       if (!uploadRes.ok) {

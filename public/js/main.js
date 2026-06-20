@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     rateDolarBlue: document.getElementById('rate-dolar-blue')
   };
 
+  let adsGeneradosGridCount = 0;
+
   // ==========================================
   // INICIALIZACIÓN
   // ==========================================
@@ -274,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = '<div class="shimmer-placeholder" style="height:200px"></div>';
 
     try {
+      adsGeneradosGridCount = 0;
       // 1. Obtener todas las categorías
       const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
@@ -843,29 +846,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function desplegarPublicidadesEstaticas() {
     // 1. Banner Superior
-    const topAd = obtenerPublicidadParaPosicion('banner_1200x100') || obtenerPublicidadParaPosicion('banner_1200x200');
+    const topAd = obtenerPublicidadParaPosicion('P-Superior') || 
+                  obtenerPublicidadParaPosicion('P-Superior-Fino') ||
+                  obtenerPublicidadParaPosicion('banner_1200x200') || 
+                  obtenerPublicidadParaPosicion('banner_1200x100');
     const topContainer = document.getElementById('ad-top-banner');
     if (topAd && topContainer) {
-      topContainer.className = topAd.tipo === 'banner_1200x200' ? 'ad-banner-1200x200' : 'ad-banner-1200x100';
+      topContainer.className = (topAd.tipo === 'P-Superior' || topAd.tipo === 'banner_1200x200') 
+        ? 'ad-banner-1200x200' 
+        : 'ad-banner-1200x100';
       topContainer.innerHTML = createAdMarkup(topAd);
       topContainer.style.display = 'flex';
     }
 
-    // 2. Banners Laterales (Posiciones 1 y 2)
-    const sidebarAds = publicidadesCargadas.filter(p => p.tipo === 'banner_300x300' && p.activo === 1);
-    
+    // 2. Banners Laterales (Posiciones P3 y P4)
+    const adP3 = obtenerPublicidadParaPosicion('P3') || obtenerPublicidadParaPosicion('banner_300x300');
     const sidebarContainer1 = document.getElementById('ad-sidebar-banner-1');
-    if (sidebarContainer1 && sidebarAds.length > 0) {
-      sidebarContainer1.innerHTML = createAdMarkup(sidebarAds[0]);
+    if (sidebarContainer1 && adP3) {
+      sidebarContainer1.innerHTML = createAdMarkup(adP3);
       sidebarContainer1.style.display = 'flex';
     }
 
+    const adP4 = obtenerPublicidadParaPosicion('P4') || (() => {
+      const ads300 = publicidadesCargadas.filter(p => (p.tipo === 'banner_300x300' || p.tipo === 'P3' || p.tipo === 'P4') && p.activo === 1);
+      if (adP3) {
+        const indexP3 = ads300.findIndex(p => p.id === adP3.id);
+        const filtered = ads300.filter((_, idx) => idx !== indexP3);
+        if (filtered.length > 0) return filtered[Math.floor(Math.random() * filtered.length)];
+      }
+      return ads300[0] || null;
+    })();
     const sidebarContainer2 = document.getElementById('ad-sidebar-banner-2');
-    if (sidebarContainer2 && sidebarAds.length > 1) {
-      sidebarContainer2.innerHTML = createAdMarkup(sidebarAds[1]);
-      sidebarContainer2.style.display = 'flex';
-    } else if (sidebarContainer2 && sidebarAds.length > 0) {
-      sidebarContainer2.innerHTML = createAdMarkup(sidebarAds[0]);
+    if (sidebarContainer2 && adP4) {
+      sidebarContainer2.innerHTML = createAdMarkup(adP4);
       sidebarContainer2.style.display = 'flex';
     }
   }
@@ -1093,11 +1106,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let claseSpan = `ad-block-span-${espacioColumnas}`;
     
     if (espacioColumnas === 1) {
-      ad = obtenerPublicidadParaPosicion('banner_300x300');
+      adsGeneradosGridCount++;
+      const posEspecifica = `P${adsGeneradosGridCount}`; // P1, P2
+      ad = obtenerPublicidadParaPosicion(posEspecifica) || obtenerPublicidadParaPosicion('banner_300x300');
     } else if (espacioColumnas === 2) {
-      ad = obtenerPublicidadParaPosicion('banner_700x100') || obtenerPublicidadParaPosicion('banner_700x200');
+      ad = obtenerPublicidadParaPosicion('P-Middle-Fino') || obtenerPublicidadParaPosicion('P-Middle') || obtenerPublicidadParaPosicion('banner_700x100') || obtenerPublicidadParaPosicion('banner_700x200');
     } else {
-      ad = obtenerPublicidadParaPosicion('banner_700x200') || obtenerPublicidadParaPosicion('banner_700x100');
+      ad = obtenerPublicidadParaPosicion('P-Middle') || obtenerPublicidadParaPosicion('P-Middle-Fino') || obtenerPublicidadParaPosicion('banner_700x200') || obtenerPublicidadParaPosicion('banner_700x100');
     }
 
     if (!ad) return null;
