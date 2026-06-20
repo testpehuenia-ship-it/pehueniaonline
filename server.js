@@ -340,42 +340,80 @@ async function procesarCampana(campanaId) {
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
                   },
-                  signal: AbortSignal.timeout(15000)
+                  signal: AbortSignal.timeout(10000)
                 });
-                if (responsePage.ok) {
-                  const htmlPage = await responsePage.text();
-                  const $page = cheerio.load(htmlPage);
+                
+                if (!responsePage.ok) {
+                  throw new Error(`HTTP ${responsePage.status}`);
+                }
+                
+                const htmlPage = await responsePage.text();
+                const $page = cheerio.load(htmlPage);
+                
+                let scrapedImg = $page('meta[property="og:image"]').attr('content') 
+                  || $page('meta[name="twitter:image"]').attr('content');
                   
-                  let scrapedImg = $page('meta[property="og:image"]').attr('content') 
-                    || $page('meta[name="twitter:image"]').attr('content');
-                    
-                  if (!scrapedImg) {
-                    const wpPostImg = $page('.wp-post-image').first();
-                    if (wpPostImg.length) {
-                      scrapedImg = wpPostImg.attr('data-lazy-src') 
-                        || wpPostImg.attr('data-src') 
-                        || wpPostImg.attr('data-original') 
-                        || wpPostImg.attr('src');
-                    }
-                  }
-                  
-                  if (!scrapedImg) {
-                    const firstArtImg = $page('article img').first();
-                    if (firstArtImg.length) {
-                      scrapedImg = firstArtImg.attr('data-lazy-src') 
-                        || firstArtImg.attr('data-src') 
-                        || firstArtImg.attr('data-original') 
-                        || firstArtImg.attr('src');
-                    }
-                  }
-                  
-                  if (scrapedImg && esImagenValida(scrapedImg)) {
-                    imagenUrl = scrapedImg;
-                    console.log(`Imagen destacada recuperada en web original: ${imagenUrl}`);
+                if (!scrapedImg) {
+                  const wpPostImg = $page('.wp-post-image').first();
+                  if (wpPostImg.length) {
+                    scrapedImg = wpPostImg.attr('data-lazy-src') 
+                      || wpPostImg.attr('data-src') 
+                      || wpPostImg.attr('data-original') 
+                      || wpPostImg.attr('src');
                   }
                 }
+                
+                if (!scrapedImg) {
+                  const firstArtImg = $page('article img').first();
+                  if (firstArtImg.length) {
+                    scrapedImg = firstArtImg.attr('data-lazy-src') 
+                      || firstArtImg.attr('data-src') 
+                      || firstArtImg.attr('data-original') 
+                      || firstArtImg.attr('src');
+                  }
+                }
+                
+                if (scrapedImg && esImagenValida(scrapedImg)) {
+                  imagenUrl = scrapedImg;
+                  console.log(`Imagen destacada recuperada en web original: ${imagenUrl}`);
+                } else {
+                  throw new Error('Imagen no encontrada o inválida en raspado directo');
+                }
               } catch (scrapeErr) {
-                console.error(`Error al raspar imagen destacada de la web original (${item.link}):`, scrapeErr.message);
+                console.warn(`Error al raspar imagen directamente de ${item.link} (${scrapeErr.message}). Intentando vía Google Translate Proxy...`);
+                try {
+                  const proxyUrl = `https://translate.google.com/translate?sl=es&tl=en&u=${encodeURIComponent(item.link)}`;
+                  const responsePage = await fetch(proxyUrl, {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+                    },
+                    signal: AbortSignal.timeout(15000)
+                  });
+                  if (responsePage.ok) {
+                    const htmlPage = await responsePage.text();
+                    const $page = cheerio.load(htmlPage);
+                    let scrapedImg = $page('meta[property="og:image"]').attr('content') 
+                      || $page('meta[name="twitter:image"]').attr('content')
+                      || $page('meta[property="twitter:image"]').attr('content');
+                      
+                    if (!scrapedImg) {
+                      const wpPostImg = $page('.wp-post-image').first();
+                      if (wpPostImg.length) {
+                        scrapedImg = wpPostImg.attr('data-lazy-src') 
+                          || wpPostImg.attr('data-src') 
+                          || wpPostImg.attr('data-original') 
+                          || wpPostImg.attr('src');
+                      }
+                    }
+                    
+                    if (scrapedImg && esImagenValida(scrapedImg)) {
+                      imagenUrl = scrapedImg;
+                      console.log(`Imagen destacada recuperada vía Google Translate Proxy: ${imagenUrl}`);
+                    }
+                  }
+                } catch (proxyScrapeErr) {
+                  console.error(`Error al raspar imagen vía Google Translate Proxy (${item.link}):`, proxyScrapeErr.message);
+                }
               }
             }
 
