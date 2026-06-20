@@ -426,7 +426,15 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ imagenBase64: base64WebP })
         });
         
-        if (!res.ok) throw new Error('Error al subir');
+        if (!res.ok) {
+          const errText = await res.text();
+          let errMsg = 'Error al subir';
+          try {
+            const parsed = JSON.parse(errText);
+            errMsg = parsed.error || errMsg;
+          } catch (e) {}
+          throw new Error(errMsg);
+        }
         const data = await res.json();
         
         // Actualizar tarjeta con la imagen real
@@ -593,7 +601,15 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ archivoBase64: base64Content })
         });
         
-        if (!res.ok) throw new Error('Error de subida');
+        if (!res.ok) {
+          const errText = await res.text();
+          let errMsg = 'Error de subida';
+          try {
+            const parsed = JSON.parse(errText);
+            errMsg = parsed.error || errMsg;
+          } catch (e) {}
+          throw new Error(errMsg);
+        }
         const data = await res.json();
         
         el.pubUrlArchivo.value = data.url;
@@ -610,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         actualizarPrevisualizacionPub(data.url, el.pubFormato.value);
       } catch (err) {
         console.error('Error al subir archivo de publicidad:', err);
-        el.previsualizacionPub.innerHTML = '<span style="color:var(--color-danger)"><i class="fa-solid fa-triangle-exclamation"></i> Error al subir</span>';
+        el.previsualizacionPub.innerHTML = `<span style="color:var(--color-danger)"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</span>`;
       }
     };
     reader.readAsDataURL(file);

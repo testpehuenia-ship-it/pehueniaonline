@@ -124,6 +124,22 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
   }
 }
 
+// Helper para resolver URLs relativas a absolutas usando URL base
+function resolverUrlAbsoluta(urlRelativa, urlPagina) {
+  if (!urlRelativa) return '';
+  if (urlRelativa.startsWith('http://') || urlRelativa.startsWith('https://')) {
+    return urlRelativa;
+  }
+  if (urlRelativa.startsWith('//')) {
+    return 'https:' + urlRelativa;
+  }
+  try {
+    return new URL(urlRelativa, urlPagina).href;
+  } catch (e) {
+    return urlRelativa;
+  }
+}
+
 // ==========================================
 // SCRAPER Y PROCESADOR DE FEEDS (WPeMatico-style)
 // ==========================================
@@ -259,16 +275,30 @@ async function procesarCampana(campanaId) {
             }
           }
 
-          // Quitar scripts e iframes nocivos del contenido para mantenerlo limpio
+          // Quitar scripts e iframes nocivos del contenido para mantenerlo limpio, y resolver URLs de imágenes relativas
           if (contenidoOriginal) {
             try {
               const $ = cheerio.load(contenidoOriginal);
               $('script').remove();
               $('iframe').remove();
+              
+              // Resolver URLs de imágenes relativas dentro del contenido
+              $('img').each((i, el) => {
+                const src = $(el).attr('src');
+                if (src) {
+                  $(el).attr('src', resolverUrlAbsoluta(src, item.link || campana.url_feed));
+                }
+              });
+              
               contenidoOriginal = $.html();
             } catch (cleanErr) {
               console.error('Error al limpiar marcado del contenido:', cleanErr);
             }
+          }
+
+          // Resolver URL de la imagen destacada para que sea absoluta
+          if (imagenUrl) {
+            imagenUrl = resolverUrlAbsoluta(imagenUrl, item.link || campana.url_feed);
           }
 
           let tituloFinal = item.title;
@@ -357,11 +387,89 @@ function inicializarCronCampanas() {
 // Inicializar el cron al levantar el servidor
 inicializarCronCampanas();
 
+// Endpoint de Vercel Cron para importación programada de campañas
+app.get('/api/cron', async (req, res) => {
+  console.log('Ejecutando Cron Job de Importación desde /api/cron...');
+  
+  db.all('SELECT id, frecuencia_minutos, ultima_ejecucion, estado FROM campanas WHERE estado = \'activa\'', async (err, campanas) => {
+    if (err) {
+      console.error('Error en cron al consultar campañas:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+
+    const ahora = new Date();
+    const promesas = [];
+
+    for (const campana of campanas) {
+      let necesitaEjecutar = false;
+
+      if (!campana.ultima_ejecucion) {
+        necesitaEjecutar = true;
+      } else {
+        try {
+          const ultimaEj = new Date(campana.ultima_ejecucion);
+          const diferenciaMinutos = Math.floor((ahora - ultimaEj) / (1000 * 60));
+          if (diferenciaMinutos >= (campana.frecuencia_minutos || 60)) {
+            necesitaEjecutar = true;
+          }
+        } catch (e) {
+          necesitaEjecutar = true;
+        }
+      }
+
+      if (necesitaEjecutar) {
+        console.log(`Cron programó ejecutar campaña ${campana.id}`);
+        promesas.push(
+          procesarCampana(campana.id)
+            .then(resultado => {
+              console.log(`Campaña ${campana.id} completada por Cron.`);
+              return { id: campana.id, status: 'completada', resultado };
+            })
+            .catch(errCamp => {
+              console.error(`Error en campaña ${campana.id} por Cron:`, errCamp.message);
+              return { id: campana.id, status: 'error', error: errCamp.message };
+            })
+        );
+      }
+    }
+
+    const resultados = await Promise.all(promesas);
+    res.json({
+      mensaje: 'Procesamiento de Cron completado',
+      fecha: ahora.toISOString(),
+      campanasProcesadas: resultados
+    });
+  });
+});
+
 // ==========================================
 // ENDPOINTS DE API REST (FRONTEND Y ADMIN)
 // ==========================================
 
 // --- APIs Públicas ---
+
+// Obtener todas las categorías (sincronizando con almacén en la nube para persistencia serverless)
+const disenoMap = {
+  'grid': 'g',
+  'carousel': 'c',
+  'list': 'l',
+  'featured': 'f',
+  'mosaic': 'm',
+  'carousel-infinite': 'i',
+  'title-overlay': 'o',
+  'large-image': 'd'
+};
+
+const reverseDisenoMap = {
+  'g': 'grid',
+  'c': 'carousel',
+  'l': 'list',
+  'f': 'featured',
+  'm': 'mosaic',
+  'i': 'carousel-infinite',
+  'o': 'title-overlay',
+  'd': 'large-image'
+};
 
 // Obtener todas las categorías (sincronizando con almacén en la nube para persistencia serverless)
 app.get('/api/categorias', (req, res) => {
@@ -384,16 +492,55 @@ app.get('/api/categorias', (req, res) => {
           const hexClean = text.replace(/"/g, '').trim();
           if (hexClean) {
             const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
-            const cloudConfig = JSON.parse(decodedString);
             
+            let cloudConfig = {};
+            let isOldFormat = false;
+
+            if (decodedString.trim().startsWith('{')) {
+              try {
+                cloudConfig = JSON.parse(decodedString);
+                isOldFormat = true;
+              } catch (e) {
+                console.error('Error parsing old format JSON in GET:', e.message);
+              }
+            } else {
+              // New format: id:disenoShort:limite,id:disenoShort:limite
+              decodedString.split(',').forEach(item => {
+                const parts = item.split(':');
+                if (parts.length === 3) {
+                  const catId = parseInt(parts[0], 10);
+                  const disenoShort = parts[1];
+                  const limite = parseInt(parts[2], 10);
+                  if (!isNaN(catId)) {
+                    cloudConfig[catId] = {
+                      diseno_home: reverseDisenoMap[disenoShort] || 'grid',
+                      limite_home: limite
+                    };
+                  }
+                }
+              });
+            }
+
             // Mezclar configuraciones de la nube en los registros locales
             rows = rows.map(row => {
-              if (cloudConfig[row.slug]) {
-                return {
-                  ...row,
-                  diseno_home: cloudConfig[row.slug].diseno_home || row.diseno_home,
-                  limite_home: cloudConfig[row.slug].limite_home || row.limite_home
-                };
+              if (isOldFormat) {
+                const config = cloudConfig[row.slug] || cloudConfig[row.nombre];
+                if (config) {
+                  return {
+                    ...row,
+                    diseno_home: config.diseno_home || row.diseno_home,
+                    limite_home: config.limite_home || row.limite_home
+                  };
+                }
+              } else {
+                const config = cloudConfig[row.id];
+                if (config) {
+                  return {
+                    ...row,
+                    diseno_home: config.diseno_home || row.diseno_home,
+                    limite_home: config.limite_home || row.limite_home
+                  };
+                }
               }
               return row;
             });
@@ -662,41 +809,45 @@ app.post('/api/admin/subir-imagen', async (req, res) => {
 
     // SI ESTAMOS EN VERCEL O PRODUCCIÓN: Subir a Catbox para evitar limitaciones de solo lectura y temporalidad
     if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
-      const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
-      const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="upload_${Date.now()}.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-      const footer = `\r\n--${boundary}--\r\n`;
+      try {
+        const formData = new FormData();
+        formData.append('reqtype', 'fileupload');
+        
+        const fileBlob = new Blob([buffer], { type: mimeType });
+        formData.append('fileToUpload', fileBlob, `upload_${Date.now()}.${ext}`);
 
-      const multipartBody = Buffer.concat([
-        Buffer.from(header1, 'utf-8'),
-        Buffer.from(header2, 'utf-8'),
-        buffer,
-        Buffer.from(footer, 'utf-8')
-      ]);
+        const uploadRes = await fetch('https://catbox.moe/user/api.php', {
+          method: 'POST',
+          body: formData
+        });
 
-      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`
-        },
-        body: multipartBody
-      });
+        if (!uploadRes.ok) {
+          throw new Error(`Catbox retornó estado ${uploadRes.status}: ${uploadRes.statusText}`);
+        }
 
-      if (!uploadRes.ok) {
-        throw new Error(`Catbox subida falló: ${uploadRes.statusText}`);
-      }
-
-      const fileUrl = await uploadRes.text();
-      if (fileUrl && fileUrl.startsWith('http')) {
-        return res.json({ url: fileUrl.trim() });
-      } else {
-        throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+        const fileUrl = await uploadRes.text();
+        if (fileUrl && fileUrl.startsWith('http')) {
+          return res.json({ url: fileUrl.trim() });
+        } else {
+          throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+        }
+      } catch (uploadError) {
+        console.error('Error al subir imagen a Catbox:', uploadError.message);
+        return res.status(502).json({ error: `La subida externa falló: ${uploadError.message}` });
       }
     }
 
-    // DESARROLLO LOCAL: Guardar en el sistema de archivos local
+    // DESARROLLO LOCAL o FALLBACK: Guardar en el sistema de archivos local
     const uniqueName = `img_${Date.now()}_${Math.round(Math.random() * 1000)}.${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
+
+    if (!fs.existsSync(uploadsDir)) {
+      try {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      } catch (err) {
+        console.warn('No se pudo crear carpeta de uploads para fallback:', err.message);
+      }
+    }
 
     fs.writeFileSync(filePath, buffer);
     const urlPublica = `/uploads/${uniqueName}`;
@@ -876,11 +1027,13 @@ app.delete('/api/admin/publicidades/:id', (req, res) => {
 
 // Actualizar configuración de diseño y límite de una categoría (guardando en SQLite y sincronizando con la nube)
 app.put('/api/admin/categorias/:id', (req, res) => {
-  const id = req.params.id;
+  const id = parseInt(req.params.id, 10);
   const { diseno_home, limite_home } = req.body;
   
-  db.get('SELECT slug FROM categorias WHERE id = ?', [id], async (err, categoryRow) => {
+  db.all('SELECT * FROM categorias', async (err, categoriasList) => {
     if (err) return res.status(500).json({ error: err.message });
+    
+    const categoryRow = categoriasList.find(c => c.id === id);
     if (!categoryRow) return res.status(404).json({ error: 'Categoría no encontrada' });
 
     const slug = categoryRow.slug;
@@ -900,7 +1053,38 @@ app.put('/api/admin/categorias/:id', (req, res) => {
           const hexClean = text.replace(/"/g, '').trim();
           if (hexClean) {
             const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
-            cloudConfig = JSON.parse(decodedString);
+            if (decodedString.trim().startsWith('{')) {
+              try {
+                const oldConfig = JSON.parse(decodedString);
+                categoriasList.forEach(cat => {
+                  const config = oldConfig[cat.slug] || oldConfig[cat.nombre];
+                  if (config) {
+                    cloudConfig[cat.id] = {
+                      diseno_home: config.diseno_home || cat.diseno_home,
+                      limite_home: config.limite_home || cat.limite_home
+                    };
+                  }
+                });
+              } catch (e) {
+                console.error('Error parsing old format JSON in PUT:', e.message);
+              }
+            } else {
+              // New format: id:disenoShort:limite,id:disenoShort:limite
+              decodedString.split(',').forEach(item => {
+                const parts = item.split(':');
+                if (parts.length === 3) {
+                  const catId = parseInt(parts[0], 10);
+                  const disenoShort = parts[1];
+                  const limite = parseInt(parts[2], 10);
+                  if (!isNaN(catId)) {
+                    cloudConfig[catId] = {
+                      diseno_home: reverseDisenoMap[disenoShort] || 'grid',
+                      limite_home: limite
+                    };
+                  }
+                }
+              });
+            }
           }
         }
       }
@@ -909,14 +1093,23 @@ app.put('/api/admin/categorias/:id', (req, res) => {
     }
 
     // 2. Modificar solo la categoría que estamos actualizando
-    cloudConfig[slug] = {
+    cloudConfig[id] = {
       diseno_home,
       limite_home: parseInt(limite_home, 10) || 3
     };
 
-    // 3. Guardar de vuelta en la nube
+    // 3. Serializar en la nueva estructura compacta
+    const serializedParts = [];
+    for (const catId of Object.keys(cloudConfig)) {
+      const config = cloudConfig[catId];
+      const disenoShort = disenoMap[config.diseno_home] || 'g';
+      serializedParts.push(`${catId}:${disenoShort}:${config.limite_home}`);
+    }
+    const serializedString = serializedParts.join(',');
+
+    // 4. Guardar de vuelta en la nube
     try {
-      const val = Buffer.from(JSON.stringify(cloudConfig)).toString('hex');
+      const val = Buffer.from(serializedString).toString('hex');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/categorias_config/${val}`, {
@@ -973,41 +1166,45 @@ app.post('/api/admin/subir-archivo', async (req, res) => {
 
     // SI ESTAMOS EN VERCEL O PRODUCCIÓN: Subir a Catbox para evitar limitaciones de solo lectura y temporalidad
     if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-      const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
-      const header1 = `--${boundary}\r\nContent-Disposition: form-data; name="reqtype"\r\n\r\nfileupload\r\n`;
-      const header2 = `--${boundary}\r\nContent-Disposition: form-data; name="fileToUpload"; filename="upload_${Date.now()}.${ext}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
-      const footer = `\r\n--${boundary}--\r\n`;
+      try {
+        const formData = new FormData();
+        formData.append('reqtype', 'fileupload');
+        
+        const fileBlob = new Blob([buffer], { type: mimeType });
+        formData.append('fileToUpload', fileBlob, `upload_${Date.now()}.${ext}`);
 
-      const multipartBody = Buffer.concat([
-        Buffer.from(header1, 'utf-8'),
-        Buffer.from(header2, 'utf-8'),
-        buffer,
-        Buffer.from(footer, 'utf-8')
-      ]);
+        const uploadRes = await fetch('https://catbox.moe/user/api.php', {
+          method: 'POST',
+          body: formData
+        });
 
-      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`
-        },
-        body: multipartBody
-      });
+        if (!uploadRes.ok) {
+          throw new Error(`Catbox retornó estado ${uploadRes.status}: ${uploadRes.statusText}`);
+        }
 
-      if (!uploadRes.ok) {
-        throw new Error(`Catbox subida falló: ${uploadRes.statusText}`);
-      }
-
-      const fileUrl = await uploadRes.text();
-      if (fileUrl && fileUrl.startsWith('http')) {
-        return res.json({ url: fileUrl.trim() });
-      } else {
-        throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+        const fileUrl = await uploadRes.text();
+        if (fileUrl && fileUrl.startsWith('http')) {
+          return res.json({ url: fileUrl.trim() });
+        } else {
+          throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+        }
+      } catch (uploadError) {
+        console.error('Error al subir archivo a Catbox:', uploadError.message);
+        return res.status(502).json({ error: `La subida externa falló: ${uploadError.message}` });
       }
     }
 
-    // DESARROLLO LOCAL: Guardar en el sistema de archivos local
+    // DESARROLLO LOCAL o FALLBACK: Guardar en el sistema de archivos local
     const uniqueName = `file_${Date.now()}_${Math.round(Math.random() * 1000)}.${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
+
+    if (!fs.existsSync(uploadsDir)) {
+      try {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      } catch (err) {
+        console.warn('No se pudo crear carpeta de uploads para fallback:', err.message);
+      }
+    }
 
     fs.writeFileSync(filePath, buffer);
     const urlPublica = `/uploads/${uniqueName}`;
