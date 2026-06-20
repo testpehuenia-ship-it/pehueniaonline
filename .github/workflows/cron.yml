@@ -1,0 +1,16 @@
+name: Actualizacion Automatica de Noticias
+
+on:
+  schedule:
+    # Ejecutar cada 2 horas (cron standard UTC)
+    - cron: '0 */2 * * *'
+  # Permitir ejecución manual desde la pestaña de Actions en GitHub
+  workflow_dispatch:
+
+jobs:
+  importar-noticias:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al endpoint de importación
+        run: |
+          curl -s -X GET "https://pehueniaonline.vercel.app/api/cron"
