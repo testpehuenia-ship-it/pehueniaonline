@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   // Estado
   let categorias = [];
+  let appConfigs = {};
 
   // Elementos
   const el = {
@@ -42,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     configAnalyticsId: document.getElementById('config-analytics-id'),
     configNombreDiario: document.getElementById('config-nombre-diario'),
     configClimaCiudad: document.getElementById('config-clima-ciudad'),
+    configCloudinaryName: document.getElementById('config-cloudinary-cloud-name'),
+    configCloudinaryPreset: document.getElementById('config-cloudinary-upload-preset'),
     
     // Tabs de Navegación
     tabInicio: document.getElementById('menu-inicio'),
@@ -215,6 +218,10 @@ document.addEventListener('DOMContentLoaded', () => {
       el.configAnalyticsId.value = configs.analytics_id || '';
       el.configNombreDiario.value = configs.nombre_diario || 'PEHUENIA ONLINE';
       el.configClimaCiudad.value = configs.clima_ciudad || 'Villa Pehuenia';
+      
+      appConfigs = configs;
+      el.configCloudinaryName.value = configs.cloudinary_cloud_name || '';
+      el.configCloudinaryPreset.value = configs.cloudinary_upload_preset || '';
 
       if (configs.analytics_id) {
         el.analyticsDot.className = 'status-dot connected';
@@ -254,7 +261,9 @@ document.addEventListener('DOMContentLoaded', () => {
       gemini_api_key: el.configGeminiKey.value.trim(),
       analytics_id: el.configAnalyticsId.value.trim(),
       nombre_diario: el.configNombreDiario.value.trim(),
-      clima_ciudad: el.configClimaCiudad.value.trim()
+      clima_ciudad: el.configClimaCiudad.value.trim(),
+      cloudinary_cloud_name: el.configCloudinaryName.value.trim(),
+      cloudinary_upload_preset: el.configCloudinaryPreset.value.trim()
     };
 
     try {
@@ -265,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (res.ok) {
+        appConfigs = payload;
         alert('Configuraciones guardadas correctamente.');
         cerrarModal('modal-configuraciones');
         fetchDashboardStats();
@@ -591,7 +601,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.previsualizacionPub.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:var(--color-primary); font-size:1.5rem;"></i>';
 
-    // 1. Intentar subir directamente desde el navegador a Catbox para evitar los límites de 4.5MB de Vercel
+    // 1. Intentar subir directamente a Cloudinary si está configurado
+    if (appConfigs.cloudinary_cloud_name && appConfigs.cloudinary_upload_preset) {
+      try {
+        console.log('Intentando subir a Cloudinary...');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', appConfigs.cloudinary_upload_preset);
+
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${appConfigs.cloudinary_cloud_name}/auto/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          throw new Error(errData.error ? errData.error.message : `Estado ${uploadRes.status}`);
+        }
+
+        const data = await uploadRes.json();
+        if (data.secure_url) {
+          const fileUrl = data.secure_url;
+          el.pubUrlArchivo.value = fileUrl;
+          
+          // Detectar formato basándose en tipo de archivo
+          if (file.type.startsWith('video/')) {
+            el.pubFormato.value = 'video';
+          } else if (file.type.includes('gif')) {
+            el.pubFormato.value = 'gif';
+          } else {
+            el.pubFormato.value = 'imagen';
+          }
+
+          actualizarPrevisualizacionPub(fileUrl, el.pubFormato.value);
+          return; // Éxito con Cloudinary
+        }
+        throw new Error('Respuesta inválida de Cloudinary');
+      } catch (cloudinaryErr) {
+        console.warn('La subida directa a Cloudinary falló, intentando con Catbox...', cloudinaryErr.message);
+      }
+    }
+
+    // 2. Intentar subir directamente desde el navegador a Catbox
     try {
       const formData = new FormData();
       formData.append('reqtype', 'fileupload');
@@ -621,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         actualizarPrevisualizacionPub(finalUrl, el.pubFormato.value);
-        return; // Éxito total
+        return; // Éxito con Catbox
       }
       throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
     } catch (directErr) {
