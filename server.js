@@ -140,6 +140,20 @@ function resolverUrlAbsoluta(urlRelativa, urlPagina) {
   }
 }
 
+// Helper para optimizar y reducir el peso de imágenes externas usando wsrv.nl (CDN gratuito de compresión y WebP)
+function optimizarUrlImagen(url) {
+  if (!url) return '';
+  // Si es una imagen local (/uploads/) o ya está optimizada con wsrv.nl, no la modificamos
+  if (url.startsWith('/uploads/') || url.includes('wsrv.nl')) {
+    return url;
+  }
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    // Redimensionar a un ancho máximo de 1000px y convertir a WebP con calidad del 80%
+    return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=1000&output=webp&q=80`;
+  }
+  return url;
+}
+
 // ==========================================
 // SCRAPER Y PROCESADOR DE FEEDS (WPeMatico-style)
 // ==========================================
@@ -282,11 +296,12 @@ async function procesarCampana(campanaId) {
               $('script').remove();
               $('iframe').remove();
               
-              // Resolver URLs de imágenes relativas dentro del contenido
+              // Resolver y optimizar (convertir a WebP y comprimir) URLs de imágenes relativas dentro del contenido
               $('img').each((i, el) => {
                 const src = $(el).attr('src');
                 if (src) {
-                  $(el).attr('src', resolverUrlAbsoluta(src, item.link || campana.url_feed));
+                  const absSrc = resolverUrlAbsoluta(src, item.link || campana.url_feed);
+                  $(el).attr('src', optimizarUrlImagen(absSrc));
                 }
               });
               
@@ -296,9 +311,9 @@ async function procesarCampana(campanaId) {
             }
           }
 
-          // Resolver URL de la imagen destacada para que sea absoluta
+          // Resolver y optimizar (convertir a WebP y comprimir) URL de la imagen destacada para que sea absoluta
           if (imagenUrl) {
-            imagenUrl = resolverUrlAbsoluta(imagenUrl, item.link || campana.url_feed);
+            imagenUrl = optimizarUrlImagen(resolverUrlAbsoluta(imagenUrl, item.link || campana.url_feed));
           }
 
           let tituloFinal = item.title;
