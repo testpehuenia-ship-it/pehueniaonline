@@ -180,8 +180,41 @@ async function procesarCampana(campanaId) {
         });
         const apiKey = apiKeyRow ? apiKeyRow.valor : '';
 
-        // Parsear el feed RSS
-        const feed = await parser.parseURL(campana.url_feed);
+        // Parsear el feed RSS (con fallback a proxy si falla por bloqueo de IP/firewall)
+        let feed;
+        try {
+          feed = await parser.parseURL(campana.url_feed);
+        } catch (parserErr) {
+          console.warn(`Error al conectar con ${campana.url_feed} directamente, intentando fallback vía rss2json...`);
+          try {
+            const proxyRes = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(campana.url_feed)}`);
+            if (proxyRes.ok) {
+              const data = await proxyRes.json();
+              if (data && data.status === 'ok') {
+                feed = {
+                  title: data.feed.title,
+                  link: data.feed.link,
+                  description: data.feed.description,
+                  items: data.items.map(item => ({
+                    title: item.title,
+                    link: item.link,
+                    pubDate: item.pubDate,
+                    content: item.content || item.description || '',
+                    'content:encoded': item.content || '',
+                    enclosure: item.enclosure && item.enclosure.link ? { url: item.enclosure.link, type: item.enclosure.type } : null
+                  }))
+                };
+              } else {
+                throw new Error(data.message || 'Formato de respuesta inválido');
+              }
+            } else {
+              throw new Error(`HTTP ${proxyRes.status}`);
+            }
+          } catch (proxyErr) {
+            console.error(`Fallback de proxy falló para ${campana.url_feed}:`, proxyErr.message);
+            throw parserErr; // Relanzar el error original si el fallback también falla
+          }
+        }
         let itemsAProcesar = feed.items.slice(0, campana.limite_por_ejecucion);
         let importados = 0;
 
