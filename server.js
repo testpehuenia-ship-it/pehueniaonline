@@ -9,7 +9,7 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const parser = new Parser();
+const parser = new Parser({ timeout: 8000 }); // Tiempo de espera de 8s para evitar que servidores caídos cuelguen la ejecución
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -356,7 +356,10 @@ async function procesarCampana(campanaId) {
 
       } catch (error) {
         console.error(`Error al procesar campaña "${campana.nombre}":`, error);
-        reject(error);
+        const ahora = new Date().toISOString();
+        db.run('UPDATE campanas SET ultima_ejecucion = ? WHERE id = ?', [ahora, campana.id], () => {
+          reject(error);
+        });
       }
     });
   });
