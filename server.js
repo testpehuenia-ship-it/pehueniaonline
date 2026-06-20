@@ -9,7 +9,7 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const parser = new Parser({ timeout: 8000 }); // Tiempo de espera de 8s para evitar que servidores caídos cuelguen la ejecución
+const parser = new Parser(); // Sin límite de espera de red para soportar servidores lentos y dar tiempo de carga completo
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -356,8 +356,17 @@ async function procesarCampana(campanaId) {
 
       } catch (error) {
         console.error(`Error al procesar campaña "${campana.nombre}":`, error);
-        const ahora = new Date().toISOString();
-        db.run('UPDATE campanas SET ultima_ejecucion = ? WHERE id = ?', [ahora, campana.id], () => {
+        const ahora = new Date();
+        const frecuencia = campana.frecuencia_minutos || 60;
+        let fechaUltimaEjecucion = ahora;
+        
+        // Si la frecuencia es mayor a 12 horas (720 minutos), se calcula un desfase en la base de datos para que reintente en 12 horas.
+        // De lo contrario, se guarda 'ahora' para reintentar en su frecuencia normal.
+        if (frecuencia > 720) {
+          fechaUltimaEjecucion = new Date(ahora.getTime() - (frecuencia - 720) * 60 * 1000);
+        }
+        
+        db.run('UPDATE campanas SET ultima_ejecucion = ? WHERE id = ?', [fechaUltimaEjecucion.toISOString(), campana.id], () => {
           reject(error);
         });
       }
