@@ -591,28 +591,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.previsualizacionPub.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:var(--color-primary); font-size:1.5rem;"></i>';
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Content = event.target.result;
-      try {
-        const res = await fetch('/api/admin/subir-archivo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ archivoBase64: base64Content })
-        });
-        
-        if (!res.ok) {
-          const errText = await res.text();
-          let errMsg = 'Error de subida';
-          try {
-            const parsed = JSON.parse(errText);
-            errMsg = parsed.error || errMsg;
-          } catch (e) {}
-          throw new Error(errMsg);
-        }
-        const data = await res.json();
-        
-        el.pubUrlArchivo.value = data.url;
+    // 1. Intentar subir directamente desde el navegador a Catbox para evitar los límites de 4.5MB de Vercel
+    try {
+      const formData = new FormData();
+      formData.append('reqtype', 'fileupload');
+      formData.append('fileToUpload', file);
+
+      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Catbox retornó estado ${uploadRes.status}`);
+      }
+
+      const fileUrl = await uploadRes.text();
+      if (fileUrl && fileUrl.trim().startsWith('http')) {
+        const finalUrl = fileUrl.trim();
+        el.pubUrlArchivo.value = finalUrl;
         
         // Detectar formato basándose en tipo de archivo
         if (file.type.startsWith('video/')) {
@@ -623,13 +620,54 @@ document.addEventListener('DOMContentLoaded', () => {
           el.pubFormato.value = 'imagen';
         }
 
-        actualizarPrevisualizacionPub(data.url, el.pubFormato.value);
-      } catch (err) {
-        console.error('Error al subir archivo de publicidad:', err);
-        el.previsualizacionPub.innerHTML = `<span style="color:var(--color-danger)"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</span>`;
+        actualizarPrevisualizacionPub(finalUrl, el.pubFormato.value);
+        return; // Éxito total
       }
-    };
-    reader.readAsDataURL(file);
+      throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
+    } catch (directErr) {
+      console.warn('La subida directa a Catbox falló, reintentando a través del backend...', directErr.message);
+
+      // 2. Fallback: Codificar a Base64 y enviar al backend
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Content = event.target.result;
+        try {
+          const res = await fetch('/api/admin/subir-archivo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ archivoBase64: base64Content })
+          });
+          
+          if (!res.ok) {
+            const errText = await res.text();
+            let errMsg = 'Error de subida';
+            try {
+              const parsed = JSON.parse(errText);
+              errMsg = parsed.error || errMsg;
+            } catch (e) {}
+            throw new Error(errMsg);
+          }
+          const data = await res.json();
+          
+          el.pubUrlArchivo.value = data.url;
+          
+          // Detectar formato basándose en tipo de archivo
+          if (file.type.startsWith('video/')) {
+            el.pubFormato.value = 'video';
+          } else if (file.type.includes('gif')) {
+            el.pubFormato.value = 'gif';
+          } else {
+            el.pubFormato.value = 'imagen';
+          }
+
+          actualizarPrevisualizacionPub(data.url, el.pubFormato.value);
+        } catch (err) {
+          console.error('Error al subir archivo de publicidad mediante backend:', err);
+          el.previsualizacionPub.innerHTML = `<span style="color:var(--color-danger)"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   async function guardarPublicidad(e) {

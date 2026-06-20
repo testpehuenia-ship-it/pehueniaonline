@@ -1,32 +1,166 @@
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-let dbPath = path.join(__dirname, 'diarioph.db');
+let db;
 
-// Si estamos en Vercel, copiamos la base de datos semilla a /tmp para evitar errores de escritura en sistema de archivos de solo lectura
-if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-  const tmpPath = path.join('/tmp', 'diarioph.db');
-  const fs = require('fs');
-  try {
-    if (!fs.existsSync(tmpPath)) {
-      console.log('Copiando base de datos semilla a /tmp...');
-      fs.copyFileSync(dbPath, tmpPath);
+// 1. COMPATIBILIDAD CON TURSO (SQLITE EN LA NUBE) PARA EVITAR LIMITACIONES DE STATELESS/VERCEL
+if (process.env.TURSO_DATABASE_URL) {
+  console.log('Utilizando base de datos Turso Cloud:', process.env.TURSO_DATABASE_URL);
+  const { createClient } = require('@libsql/client');
+  const client = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN
+  });
+
+  // Clase para envolver el cliente de libsql y simular la API callback de sqlite3
+  class LibsqlDbWrapper {
+    constructor(libsqlClient) {
+      this.client = libsqlClient;
+      this.queue = Promise.resolve();
     }
-    dbPath = tmpPath;
-  } catch (err) {
-    console.error('Error al copiar base de datos a /tmp:', err.message);
+
+    _enqueue(operation) {
+      const promise = this.queue.then(() => operation());
+      this.queue = promise.catch((err) => {
+        console.error("LibsqlDbWrapper queue execution error:", err.message);
+      });
+      return promise;
+    }
+
+    all(sql, params, callback) {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      if (!params) params = [];
+
+      this._enqueue(() => this.client.execute({ sql, args: params }))
+        .then(result => {
+          const rows = result.rows.map(r => {
+            const obj = {};
+            result.columns.forEach(col => {
+              obj[col] = r[col];
+            });
+            return obj;
+          });
+          if (callback) callback(null, rows);
+        })
+        .catch(err => {
+          if (callback) callback(err);
+        });
+    }
+
+    get(sql, params, callback) {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      if (!params) params = [];
+
+      this._enqueue(() => this.client.execute({ sql, args: params }))
+        .then(result => {
+          if (result.rows.length === 0) {
+            if (callback) callback(null, undefined);
+          } else {
+            const r = result.rows[0];
+            const obj = {};
+            result.columns.forEach(col => {
+              obj[col] = r[col];
+            });
+            if (callback) callback(null, obj);
+          }
+        })
+        .catch(err => {
+          if (callback) callback(err);
+        });
+    }
+
+    run(sql, params, callback) {
+      if (typeof params === 'function') {
+        callback = params;
+        params = [];
+      }
+      if (!params) params = [];
+
+      this._enqueue(() => this.client.execute({ sql, args: params }))
+        .then(result => {
+          const lastID = result.lastInsertRowid !== undefined ? Number(result.lastInsertRowid) : undefined;
+          const changes = result.rowsAffected;
+          if (callback) {
+            callback.call({ lastID, changes }, null);
+          }
+        })
+        .catch(err => {
+          if (callback) {
+            callback(err);
+          }
+        });
+    }
+
+    serialize(callback) {
+      // Las llamadas dentro de serialize se encolan secuencialmente a través de la propiedad queue de la clase
+      callback();
+    }
+
+    prepare(sql) {
+      const self = this;
+      return {
+        run(...args) {
+          let params = args;
+          let callback = undefined;
+          if (typeof args[args.length - 1] === 'function') {
+            callback = args[args.length - 1];
+            params = args.slice(0, args.length - 1);
+          }
+          if (Array.isArray(params[0])) {
+            params = params[0];
+          }
+          self.run(sql, params, callback);
+        },
+        finalize(callback) {
+          self._enqueue(() => Promise.resolve())
+            .then(() => {
+              if (callback) callback(null);
+            })
+            .catch(err => {
+              if (callback) callback(err);
+            });
+        }
+      };
+    }
   }
+
+  db = new LibsqlDbWrapper(client);
+
+} else {
+  // 2. CONEXIÓN LOCAL CLÁSICA CON SQLITE3
+  const sqlite3 = require('sqlite3').verbose();
+  let dbPath = path.join(__dirname, 'diarioph.db');
+
+  // Si estamos en Vercel, copiamos la base de datos semilla a /tmp para evitar errores de escritura en sistema de archivos de solo lectura
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    const tmpPath = path.join('/tmp', 'diarioph.db');
+    try {
+      if (!fs.existsSync(tmpPath)) {
+        console.log('Copiando base de datos semilla a /tmp...');
+        fs.copyFileSync(dbPath, tmpPath);
+      }
+      dbPath = tmpPath;
+    } catch (err) {
+      console.error('Error al copiar base de datos a /tmp:', err.message);
+    }
+  }
+
+  db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+      console.error('Error al abrir la base de datos SQLite:', err.message);
+    } else {
+      console.log('Conectado a la base de datos SQLite:', dbPath);
+    }
+  });
 }
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error al abrir la base de datos SQLite:', err.message);
-  } else {
-    console.log('Conectado a la base de datos SQLite:', dbPath);
-  }
-});
-
-// Inicializar tablas
+// Inicializar tablas (se ejecuta de igual manera tanto en local como en Turso)
 db.serialize(() => {
   // 1. Tabla de Categorías (con soporte para diseños personalizados en el home)
   db.run(`
@@ -138,9 +272,9 @@ db.serialize(() => {
 
   // Insertar campañas por defecto (WPeMatico feeds del usuario)
   db.get('SELECT COUNT(*) as count FROM campanas', (err, row) => {
-    if (!err && row.count === 0) {
+    if (!err && row && row.count === 0) {
       db.all('SELECT id, slug FROM categorias', (err, rows) => {
-        if (!err) {
+        if (!err && rows) {
           const catMap = {};
           rows.forEach(r => { catMap[r.slug] = r.id; });
 
@@ -202,7 +336,7 @@ db.serialize(() => {
 
   // Insertar reproductores por defecto
   db.get('SELECT COUNT(*) as count FROM reproductores', (err, row) => {
-    if (!err && row.count === 0) {
+    if (!err && row && row.count === 0) {
       const stmtRep = db.prepare('INSERT INTO reproductores (nombre, url_stream, activo) VALUES (?, ?, ?)');
       stmtRep.run('FM Pehuenia Radio 95.1', 'https://stream.server.com/radio.mp3', 1);
       stmtRep.run('FM Moquehue Radio 92.7', 'https://stream.server.com/radio2.mp3', 1);
@@ -229,7 +363,7 @@ db.serialize(() => {
 
   // Sembrar publicidades de prueba
   db.get('SELECT COUNT(*) as count FROM publicidades', (err, row) => {
-    if (!err && row.count === 0) {
+    if (!err && row && row.count === 0) {
       const stmtPub = db.prepare('INSERT INTO publicidades (nombre, tipo, formato, url_archivo, url_destino, activo) VALUES (?, ?, ?, ?, ?, ?)');
       
       // 1. Banner Superior Grande 1200x200
