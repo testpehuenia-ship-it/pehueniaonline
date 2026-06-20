@@ -66,9 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cargar nuevos widgets de barra lateral
     renderClimaSemanal();
     renderFixtureMundial();
-    renderSidebarCategory('policiales', 'sidebar-policiales-category', 'fa-solid fa-building-shield');
-    renderSidebarCategory('entretenimiento-y-curiosidades', 'sidebar-curiosidades-category', 'fa-solid fa-lightbulb');
-    renderSidebarCategory('mascotas', 'sidebar-compact-category', 'fa-solid fa-paw');
+    renderSidebarCategoriesDynamically();
   }
 
   // ==========================================
@@ -281,8 +279,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
 
-      // Filtrar páginas de navegación fijas y las que van al lateral derecho (Policiales, Curiosidades y Mascotas)
-      const categoriasHome = categorias.filter(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto' && c.slug !== 'policiales' && c.slug !== 'entretenimiento-y-curiosidades' && c.slug !== 'mascotas');
+      // Filtrar categorías activas para la columna principal (izquierda) y ordenar
+      const categoriasHome = categorias.filter(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto' && c.posicion_home !== 'derecha');
+      categoriasHome.sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.id - b.id);
 
 
       container.innerHTML = '';
@@ -1252,31 +1251,72 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Widget de Categoría Compacta en Barra Lateral
-  async function renderSidebarCategory(categorySlug, containerId, iconClass) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    
+  // Widget de Categorías Dinámicas en Barra Lateral
+  async function renderSidebarCategoriesDynamically() {
+    const placeholders = ['sidebar-policiales-category', 'sidebar-curiosidades-category', 'sidebar-compact-category'];
+    placeholders.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+      }
+    });
+
+    // Remover contenedores dinámicos previos si los hubiere
+    document.querySelectorAll('[id^="sidebar-dynamic-cat-"]').forEach(el => el.remove());
+
     try {
       const catRes = await fetch('/api/categorias?_t=' + Date.now());
       const categorias = await catRes.json();
-      
-      let targetCat = categorias.find(c => c.slug === categorySlug);
-      
-      // Fallback si no encuentra la categoría deseada (solo para el sidebar principal compact)
-      if (!targetCat && containerId === 'sidebar-compact-category') {
-        targetCat = categorias.find(c => c.slug === 'mascotas') 
-          || categorias.find(c => c.slug === 'internacionales')
-          || categorias.find(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto');
+
+      const rightCats = categorias.filter(c => c.posicion_home === 'derecha');
+      rightCats.sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.id - b.id);
+
+      const iconMap = {
+        'policiales': 'fa-solid fa-building-shield',
+        'entretenimiento-y-curiosidades': 'fa-solid fa-lightbulb',
+        'mascotas': 'fa-solid fa-paw',
+        'deportes': 'fa-solid fa-volleyball',
+        'economia': 'fa-solid fa-wallet',
+        'politica': 'fa-solid fa-landmark',
+        'tecnologia': 'fa-solid fa-laptop-code',
+        'guias-de-servicios-y-reservas': 'fa-solid fa-concierge-bell',
+        'provinciales': 'fa-solid fa-map-location-dot',
+        'nacionales': 'fa-solid fa-flag',
+        'internacionales': 'fa-solid fa-globe'
+      };
+
+      let lastContainer = document.getElementById(placeholders[placeholders.length - 1]);
+
+      for (let i = 0; i < rightCats.length; i++) {
+        const cat = rightCats[i];
+        let container;
+        if (i < placeholders.length) {
+          container = document.getElementById(placeholders[i]);
+        } else {
+          container = document.createElement('div');
+          container.className = 'sidebar-widget compact-category-widget';
+          container.id = `sidebar-dynamic-cat-${cat.id}`;
+          if (lastContainer && lastContainer.parentNode) {
+            lastContainer.parentNode.insertBefore(container, lastContainer.nextSibling);
+            lastContainer = container;
+          }
+        }
+
+        if (container) {
+          const iconClass = iconMap[cat.slug] || 'fa-solid fa-newspaper';
+          await populateSidebarContainer(cat, container, iconClass);
+        }
       }
-        
-      if (!targetCat) {
-        container.style.display = 'none';
-        return;
-      }
-      
-      const limit = targetCat.limite_home || 3;
-      const res = await fetch(`/api/noticias?categoria=${targetCat.slug}&limite=${limit}&_t=` + Date.now());
+    } catch (err) {
+      console.error('Error rendering sidebar categories dynamically:', err);
+    }
+  }
+
+  async function populateSidebarContainer(category, container, iconClass) {
+    try {
+      const limit = category.limite_home || 3;
+      const res = await fetch(`/api/noticias?categoria=${category.slug}&limite=${limit}&_t=` + Date.now());
       const noticias = await res.json();
       
       if (noticias.length === 0) {
@@ -1286,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       container.style.display = 'block';
       container.innerHTML = `
-        <h3 class="widget-title"><i class="${iconClass || 'fa-solid fa-list-ul'}"></i> ${targetCat.nombre}</h3>
+        <h3 class="widget-title"><i class="${iconClass || 'fa-solid fa-list-ul'}"></i> ${category.nombre}</h3>
         <div class="compact-posts-list"></div>
       `;
       
@@ -1313,9 +1353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => showArticleDetail(n.id));
         listContainer.appendChild(item);
       });
-      
     } catch (err) {
-      console.error(`Error al cargar categoría compacta ${categorySlug}:`, err);
+      console.error(`Error populating sidebar category ${category.slug}:`, err);
       container.style.display = 'none';
     }
   }

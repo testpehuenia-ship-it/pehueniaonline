@@ -451,23 +451,59 @@
             <div class="panel-title">Gestión de Categorías y Diseño del Inicio</div>
           </div>
           <p style="font-size:0.8rem; color:var(--text-muted); margin: 0 20px 15px 20px;">
-            Configura el formato estético en el que se verá cada categoría dentro de la página principal del diario y la cantidad de artículos mostrados.
+            Configura la ubicación (izquierda o derecha), orden de aparición, formato de diseño y límite de artículos para cada categoría en la portada.
           </p>
-          <div class="table-wrapper">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>Categoría</th>
-                  <th>Identificador (Slug)</th>
-                  <th>Diseño en Inicio</th>
-                  <th>Límite Noticias</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="categorias-table-body">
-                <!-- Cargado con JavaScript -->
-              </tbody>
-            </table>
+          
+          <div style="margin: 20px; display: grid; grid-template-columns: 1fr; gap: 20px;">
+            
+            <!-- Columna Principal (Izquierda) -->
+            <div class="categoria-grupo-panel" style="border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; background: var(--bg-secondary);">
+              <h3 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-align-left" style="color: var(--color-primary);"></i> Columna Principal (Izquierda - Cuerpo del Diario)
+              </h3>
+              <div class="table-wrapper">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Categoría</th>
+                      <th>Slug</th>
+                      <th>Diseño</th>
+                      <th>Límite</th>
+                      <th>Orden</th>
+                      <th style="width: 180px; text-align: center;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="categorias-izquierda-table-body">
+                    <!-- Cargado con JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Barra Lateral (Derecha) -->
+            <div class="categoria-grupo-panel" style="border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; background: var(--bg-secondary);">
+              <h3 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-align-right" style="color: var(--color-primary);"></i> Barra Lateral (Derecha - Compacta)
+              </h3>
+              <div class="table-wrapper">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Categoría</th>
+                      <th>Slug</th>
+                      <th>Diseño</th>
+                      <th>Límite</th>
+                      <th>Orden</th>
+                      <th style="width: 180px; text-align: center;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="categorias-derecha-table-body">
+                    <!-- Cargado con JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -944,6 +980,21 @@
             <label for="cat-config-limite">Cantidad de Noticias a Mostrar</label>
             <input type="number" id="cat-config-limite" class="form-control" min="1" max="15" value="3" required>
             <p style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Define el número máximo de artículos de esta categoría en la portada.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="cat-config-posicion">Ubicación en Portada</label>
+            <select id="cat-config-posicion" class="form-control" required>
+              <option value="izquierda">Columna Principal (Izquierda - 3 Columnas)</option>
+              <option value="derecha">Barra Lateral (Derecha - Compacta)</option>
+            </select>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Elige si la categoría se muestra en el cuerpo izquierdo principal o en el lateral derecho.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="cat-config-orden">Orden de Aparición</label>
+            <input type="number" id="cat-config-orden" class="form-control" min="0" value="0" required>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">Número para ordenar. Se recomienda reordenar directamente con las flechas en la tabla principal.</p>
           </div>
 
         </form>

@@ -76,13 +76,16 @@ document.addEventListener('DOMContentLoaded', () => {
     previsualizacionPub: document.getElementById('previsualizacion-pub'),
 
     // Categorías Config elements
-    categoriasTableBody: document.getElementById('categorias-table-body'),
+    categoriasIzquierdaTableBody: document.getElementById('categorias-izquierda-table-body'),
+    categoriasDerechaTableBody: document.getElementById('categorias-derecha-table-body'),
     btnGuardarCategoriaConfig: document.getElementById('btn-guardar-categoria-config'),
     formCategoriaConfig: document.getElementById('form-categoria-config'),
     catConfigId: document.getElementById('cat-config-id'),
     catConfigNombre: document.getElementById('cat-config-nombre'),
     catConfigDiseno: document.getElementById('cat-config-diseno'),
-    catConfigLimite: document.getElementById('cat-config-limite')
+    catConfigLimite: document.getElementById('cat-config-limite'),
+    catConfigPosicion: document.getElementById('cat-config-posicion'),
+    catConfigOrden: document.getElementById('cat-config-orden')
   };
 
   // ==========================================
@@ -782,46 +785,129 @@ document.addEventListener('DOMContentLoaded', () => {
   // CONFIGURACIÓN DE DISEÑOS DE CATEGORÍAS
   // ==========================================
 
+  async function enviarOrdenesBulk(catsList) {
+    try {
+      const payload = catsList.map(c => ({
+        id: c.id,
+        posicion_home: c.posicion_home || 'izquierda',
+        orden: c.orden
+      }));
+      const res = await fetch('/api/admin/categorias-bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        fetchCategoriasConfigList();
+      } else {
+        alert('Error al reordenar las categorías.');
+      }
+    } catch (err) {
+      console.error('Error en bulk update:', err);
+      alert('Error de conexión al reordenar.');
+    }
+  }
+
   async function fetchCategoriasConfigList() {
     try {
       const res = await fetch('/api/categorias?_t=' + Date.now());
       const cats = await res.json();
       
-      el.categoriasTableBody.innerHTML = '';
+      el.categoriasIzquierdaTableBody.innerHTML = '';
+      el.categoriasDerechaTableBody.innerHTML = '';
       
       // Filtrar páginas virtuales
       const catsFiltradas = cats.filter(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto');
 
-      catsFiltradas.forEach(cat => {
-        const tr = document.createElement('tr');
-        
-        let disenoLabel = 'Grilla estándar';
-        if (cat.diseno_home === 'carousel') disenoLabel = 'Carrusel horizontal';
-        else if (cat.diseno_home === 'list') disenoLabel = 'Lista compacta';
-        else if (cat.diseno_home === 'featured') disenoLabel = 'Destacada + Lista';
-        else if (cat.diseno_home === 'mosaic') disenoLabel = 'Mosaico asimétrico';
-        else if (cat.diseno_home === 'large-image') disenoLabel = 'Foto Grande (1 Col)';
-        else if (cat.diseno_home === 'title-overlay') disenoLabel = 'Título s/ Foto (1 Col)';
-        else if (cat.diseno_home === 'carousel-infinite') disenoLabel = 'Carrusel Infinito (3 Cols)';
+      // Separar por ubicación
+      const catsIzquierda = catsFiltradas.filter(c => c.posicion_home !== 'derecha');
+      const catsDerecha = catsFiltradas.filter(c => c.posicion_home === 'derecha');
 
-        tr.innerHTML = `
-          <td style="font-weight:600">${cat.nombre}</td>
-          <td><code style="background-color:var(--bg-tertiary); padding:2px 6px; border-radius:2px;">${cat.slug}</code></td>
-          <td style="text-transform: capitalize; font-weight:500;">${disenoLabel}</td>
-          <td style="font-weight:600; text-align:center;">${cat.limite_home}</td>
-          <td>
-            <button class="btn btn-outline btn-editar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-solid fa-sliders"></i> Ajustar Inicio</button>
-          </td>
-        `;
+      // Ordenar ascendentemente
+      catsIzquierda.sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.id - b.id);
+      catsDerecha.sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.id - b.id);
 
-        tr.querySelector('.btn-editar').addEventListener('click', () => abrirModalCategoriaConfig(cat));
+      // Renderizar tablas
+      renderTablaCategoriasGrupo(catsIzquierda, el.categoriasIzquierdaTableBody);
+      renderTablaCategoriasGrupo(catsDerecha, el.categoriasDerechaTableBody);
 
-        el.categoriasTableBody.appendChild(tr);
-      });
     } catch (e) {
       console.error('Error al cargar configurador de categorías:', e);
-      el.categoriasTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--color-danger)">Error al cargar categorías.</td></tr>';
+      el.categoriasIzquierdaTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--color-danger)">Error al cargar categorías.</td></tr>';
+      el.categoriasDerechaTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--color-danger)">Error al cargar categorías.</td></tr>';
     }
+  }
+
+  function renderTablaCategoriasGrupo(list, container) {
+    if (list.length === 0) {
+      container.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding: 15px;">No hay categorías en esta ubicación.</td></tr>';
+      return;
+    }
+
+    list.forEach((cat, index) => {
+      const tr = document.createElement('tr');
+      
+      let disenoLabel = 'Grilla estándar';
+      if (cat.diseno_home === 'carousel') disenoLabel = 'Carrusel horizontal';
+      else if (cat.diseno_home === 'list') disenoLabel = 'Lista compacta';
+      else if (cat.diseno_home === 'featured') disenoLabel = 'Destacada + Lista';
+      else if (cat.diseno_home === 'mosaic') disenoLabel = 'Mosaico asimétrico';
+      else if (cat.diseno_home === 'large-image') disenoLabel = 'Foto Grande (1 Col)';
+      else if (cat.diseno_home === 'title-overlay') disenoLabel = 'Título s/ Foto (1 Col)';
+      else if (cat.diseno_home === 'carousel-infinite') disenoLabel = 'Carrusel Infinito (3 Cols)';
+
+      const isFirst = index === 0;
+      const isLast = index === list.length - 1;
+
+      tr.innerHTML = `
+        <td style="font-weight:600">${cat.nombre}</td>
+        <td><code style="background-color:var(--bg-tertiary); padding:2px 6px; border-radius:2px;">${cat.slug}</code></td>
+        <td style="font-weight:500;">${disenoLabel}</td>
+        <td style="font-weight:600; text-align:center;">${cat.limite_home}</td>
+        <td style="font-weight:600; text-align:center;">${cat.orden || 0}</td>
+        <td>
+          <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+            <button class="btn btn-outline btn-subir" style="padding:4px 8px; font-size:0.75rem;" ${isFirst ? 'disabled' : ''} title="Subir orden">
+              <i class="fa-solid fa-arrow-up"></i>
+            </button>
+            <button class="btn btn-outline btn-bajar" style="padding:4px 8px; font-size:0.75rem;" ${isLast ? 'disabled' : ''} title="Bajar orden">
+              <i class="fa-solid fa-arrow-down"></i>
+            </button>
+            <button class="btn btn-outline btn-editar" style="padding:4px 8px; font-size:0.75rem;" title="Ajustar diseño">
+              <i class="fa-solid fa-sliders"></i> Ajustar
+            </button>
+          </div>
+        </td>
+      `;
+
+      tr.querySelector('.btn-editar').addEventListener('click', () => abrirModalCategoriaConfig(cat));
+      
+      if (!isFirst) {
+        tr.querySelector('.btn-subir').addEventListener('click', () => {
+          const newList = [...list];
+          const temp = newList[index];
+          newList[index] = newList[index - 1];
+          newList[index - 1] = temp;
+          
+          newList.forEach((c, idx) => { c.orden = idx; });
+          enviarOrdenesBulk(newList);
+        });
+      }
+
+      if (!isLast) {
+        tr.querySelector('.btn-bajar').addEventListener('click', () => {
+          const newList = [...list];
+          const temp = newList[index];
+          newList[index] = newList[index + 1];
+          newList[index + 1] = temp;
+          
+          newList.forEach((c, idx) => { c.orden = idx; });
+          enviarOrdenesBulk(newList);
+        });
+      }
+
+      container.appendChild(tr);
+    });
   }
 
   function abrirModalCategoriaConfig(cat) {
@@ -831,6 +917,8 @@ document.addEventListener('DOMContentLoaded', () => {
     el.catConfigNombre.value = cat.nombre;
     el.catConfigDiseno.value = cat.diseno_home || 'grid';
     el.catConfigLimite.value = cat.limite_home || 3;
+    el.catConfigPosicion.value = cat.posicion_home || 'izquierda';
+    el.catConfigOrden.value = cat.orden || 0;
 
     abrirModal('modal-categoria-config');
   }
@@ -841,7 +929,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = el.catConfigId.value;
     const payload = {
       diseno_home: el.catConfigDiseno.value,
-      limite_home: parseInt(el.catConfigLimite.value)
+      limite_home: parseInt(el.catConfigLimite.value),
+      posicion_home: el.catConfigPosicion.value,
+      orden: parseInt(el.catConfigOrden.value) || 0
     };
 
     if (isNaN(payload.limite_home) || payload.limite_home < 1) {

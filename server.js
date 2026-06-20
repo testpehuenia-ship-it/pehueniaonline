@@ -519,17 +519,21 @@ app.get('/api/categorias', (req, res) => {
                 console.error('Error parsing old format JSON in GET:', e.message);
               }
             } else {
-              // New format: id:disenoShort:limite,id:disenoShort:limite
+              // New format: id:disenoShort:limite:posicionShort:orden
               decodedString.split(',').forEach(item => {
                 const parts = item.split(':');
-                if (parts.length === 3) {
+                if (parts.length >= 3) {
                   const catId = parseInt(parts[0], 10);
                   const disenoShort = parts[1];
                   const limite = parseInt(parts[2], 10);
+                  const posShort = parts[3] || 'i';
+                  const ordVal = parseInt(parts[4], 10) || 0;
                   if (!isNaN(catId)) {
                     cloudConfig[catId] = {
                       diseno_home: reverseDisenoMap[disenoShort] || 'grid',
-                      limite_home: limite
+                      limite_home: limite,
+                      posicion_home: posShort === 'd' ? 'derecha' : 'izquierda',
+                      orden: ordVal
                     };
                   }
                 }
@@ -544,7 +548,9 @@ app.get('/api/categorias', (req, res) => {
                   return {
                     ...row,
                     diseno_home: config.diseno_home || row.diseno_home,
-                    limite_home: config.limite_home || row.limite_home
+                    limite_home: config.limite_home || row.limite_home,
+                    posicion_home: config.posicion_home || row.posicion_home || 'izquierda',
+                    orden: config.orden !== undefined ? config.orden : (row.orden || 0)
                   };
                 }
               } else {
@@ -553,7 +559,9 @@ app.get('/api/categorias', (req, res) => {
                   return {
                     ...row,
                     diseno_home: config.diseno_home || row.diseno_home,
-                    limite_home: config.limite_home || row.limite_home
+                    limite_home: config.limite_home || row.limite_home,
+                    posicion_home: config.posicion_home || row.posicion_home || 'izquierda',
+                    orden: config.orden !== undefined ? config.orden : (row.orden || 0)
                   };
                 }
               }
@@ -1043,7 +1051,7 @@ app.delete('/api/admin/publicidades/:id', (req, res) => {
 // Actualizar configuración de diseño y límite de una categoría (guardando en SQLite y sincronizando con la nube)
 app.put('/api/admin/categorias/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const { diseno_home, limite_home } = req.body;
+  const { diseno_home, limite_home, posicion_home, orden } = req.body;
   
   db.all('SELECT * FROM categorias', async (err, categoriasList) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -1076,7 +1084,9 @@ app.put('/api/admin/categorias/:id', (req, res) => {
                   if (config) {
                     cloudConfig[cat.id] = {
                       diseno_home: config.diseno_home || cat.diseno_home,
-                      limite_home: config.limite_home || cat.limite_home
+                      limite_home: config.limite_home || cat.limite_home,
+                      posicion_home: config.posicion_home || cat.posicion_home || 'izquierda',
+                      orden: config.orden !== undefined ? config.orden : (cat.orden || 0)
                     };
                   }
                 });
@@ -1084,17 +1094,21 @@ app.put('/api/admin/categorias/:id', (req, res) => {
                 console.error('Error parsing old format JSON in PUT:', e.message);
               }
             } else {
-              // New format: id:disenoShort:limite,id:disenoShort:limite
+              // New format: id:disenoShort:limite:posicionShort:orden
               decodedString.split(',').forEach(item => {
                 const parts = item.split(':');
-                if (parts.length === 3) {
+                if (parts.length >= 3) {
                   const catId = parseInt(parts[0], 10);
                   const disenoShort = parts[1];
                   const limite = parseInt(parts[2], 10);
+                  const posShort = parts[3] || 'i';
+                  const ordVal = parseInt(parts[4], 10) || 0;
                   if (!isNaN(catId)) {
                     cloudConfig[catId] = {
                       diseno_home: reverseDisenoMap[disenoShort] || 'grid',
-                      limite_home: limite
+                      limite_home: limite,
+                      posicion_home: posShort === 'd' ? 'derecha' : 'izquierda',
+                      orden: ordVal
                     };
                   }
                 }
@@ -1110,7 +1124,9 @@ app.put('/api/admin/categorias/:id', (req, res) => {
     // 2. Modificar solo la categoría que estamos actualizando
     cloudConfig[id] = {
       diseno_home,
-      limite_home: parseInt(limite_home, 10) || 3
+      limite_home: parseInt(limite_home, 10) || 3,
+      posicion_home: posicion_home || 'izquierda',
+      orden: parseInt(orden, 10) || 0
     };
 
     // 3. Serializar en la nueva estructura compacta
@@ -1118,7 +1134,9 @@ app.put('/api/admin/categorias/:id', (req, res) => {
     for (const catId of Object.keys(cloudConfig)) {
       const config = cloudConfig[catId];
       const disenoShort = disenoMap[config.diseno_home] || 'g';
-      serializedParts.push(`${catId}:${disenoShort}:${config.limite_home}`);
+      const posShort = config.posicion_home === 'derecha' ? 'd' : 'i';
+      const ordVal = config.orden || 0;
+      serializedParts.push(`${catId}:${disenoShort}:${config.limite_home}:${posShort}:${ordVal}`);
     }
     const serializedString = serializedParts.join(',');
 
@@ -1133,19 +1151,180 @@ app.put('/api/admin/categorias/:id', (req, res) => {
       });
       clearTimeout(timeoutId);
     } catch (e) {
-      console.error('Error al subir configuraciones de categorías a la nube:', e.message);
+      console.error('Error al guardar configuración en la nube:', e.message);
     }
 
-    // También actualizar localmente por si acaso (para desarrollo local)
+    // 5. Guardar en la base de datos local / nube Turso
     db.run(`
       UPDATE categorias
-      SET diseno_home = ?, limite_home = ?
+      SET diseno_home = ?, limite_home = ?, posicion_home = ?, orden = ?
       WHERE id = ?
-    `, [diseno_home, limite_home, id], (updateErr) => {
+    `, [diseno_home, parseInt(limite_home, 10) || 3, posicion_home || 'izquierda', parseInt(orden, 10) || 0, id], (updateErr) => {
+      if (updateErr) {
+        return res.status(500).json({ error: updateErr.message });
+      }
       res.json({ message: 'Diseño de categoría actualizado con éxito' });
     });
   });
 });
+
+// Endpoint bulk para actualizar configuraciones de categorías en lote (bulk)
+app.put('/api/admin/categorias-bulk', (req, res) => {
+  const updates = req.body;
+  if (!Array.isArray(updates)) {
+    return res.status(400).json({ error: 'Payload must be an array of category updates.' });
+  }
+
+  db.all('SELECT * FROM categorias', async (err, categoriasList) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    let cloudConfig = {};
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const kvRes = await fetch('https://keyvalue.immanuel.co/api/KeyVal/GetValue/nwoxgbkq/categorias_config', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (kvRes.ok) {
+        const text = await kvRes.text();
+        if (text) {
+          const hexClean = text.replace(/"/g, '').trim();
+          if (hexClean) {
+            const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
+            if (decodedString.trim().startsWith('{')) {
+              try {
+                const oldConfig = JSON.parse(decodedString);
+                categoriasList.forEach(cat => {
+                  const config = oldConfig[cat.slug] || oldConfig[cat.nombre];
+                  if (config) {
+                    cloudConfig[cat.id] = {
+                      diseno_home: config.diseno_home || cat.diseno_home,
+                      limite_home: config.limite_home || cat.limite_home,
+                      posicion_home: config.posicion_home || cat.posicion_home || 'izquierda',
+                      orden: config.orden !== undefined ? config.orden : (cat.orden || 0)
+                    };
+                  }
+                });
+              } catch (e) {
+                console.error('Error parsing old format JSON in GET:', e.message);
+              }
+            } else {
+              decodedString.split(',').forEach(item => {
+                const parts = item.split(':');
+                if (parts.length >= 3) {
+                  const catId = parseInt(parts[0], 10);
+                  const disenoShort = parts[1];
+                  const limite = parseInt(parts[2], 10);
+                  const posShort = parts[3] || 'i';
+                  const ordVal = parseInt(parts[4], 10) || 0;
+                  if (!isNaN(catId)) {
+                    cloudConfig[catId] = {
+                      diseno_home: reverseDisenoMap[disenoShort] || 'grid',
+                      limite_home: limite,
+                      posicion_home: posShort === 'd' ? 'derecha' : 'izquierda',
+                      orden: ordVal
+                    };
+                  }
+                }
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error al recuperar config actual de la nube en bulk:', e.message);
+    }
+
+    updates.forEach(u => {
+      const catId = parseInt(u.id, 10);
+      const dbRow = categoriasList.find(c => c.id === catId);
+      if (dbRow) {
+        if (!cloudConfig[catId]) {
+          cloudConfig[catId] = {
+            diseno_home: dbRow.diseno_home || 'grid',
+            limite_home: dbRow.limite_home || 3,
+            posicion_home: dbRow.posicion_home || 'izquierda',
+            orden: dbRow.orden || 0
+          };
+        }
+        if (u.diseno_home !== undefined) cloudConfig[catId].diseno_home = u.diseno_home;
+        if (u.limite_home !== undefined) cloudConfig[catId].limite_home = parseInt(u.limite_home, 10) || 3;
+        if (u.posicion_home !== undefined) cloudConfig[catId].posicion_home = u.posicion_home;
+        if (u.orden !== undefined) cloudConfig[catId].orden = parseInt(u.orden, 10) || 0;
+      }
+    });
+
+    const serializedParts = [];
+    for (const catId of Object.keys(cloudConfig)) {
+      const config = cloudConfig[catId];
+      const disenoShort = disenoMap[config.diseno_home] || 'g';
+      const posShort = config.posicion_home === 'derecha' ? 'd' : 'i';
+      const ordVal = config.orden || 0;
+      serializedParts.push(`${catId}:${disenoShort}:${config.limite_home}:${posShort}:${ordVal}`);
+    }
+    const serializedString = serializedParts.join(',');
+
+    try {
+      const val = Buffer.from(serializedString).toString('hex');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/nwoxgbkq/categorias_config/${val}`, {
+        method: 'POST',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (e) {
+      console.error('Error al guardar en bulk en la nube:', e.message);
+    }
+
+    if (updates.length === 0) {
+      return res.json({ message: 'No hay categorías para actualizar' });
+    }
+
+    let updateCount = 0;
+    let hasError = false;
+    let errMsg = '';
+
+    updates.forEach(u => {
+      const catId = parseInt(u.id, 10);
+      const dbRow = categoriasList.find(c => c.id === catId);
+      if (dbRow) {
+        const diseno = u.diseno_home !== undefined ? u.diseno_home : (dbRow.diseno_home || 'grid');
+        const limite = u.limite_home !== undefined ? parseInt(u.limite_home, 10) || 3 : (dbRow.limite_home || 3);
+        const posicion = u.posicion_home !== undefined ? u.posicion_home : (dbRow.posicion_home || 'izquierda');
+        const orden = u.orden !== undefined ? parseInt(u.orden, 10) || 0 : (dbRow.orden || 0);
+
+        db.run(`
+          UPDATE categorias
+          SET diseno_home = ?, limite_home = ?, posicion_home = ?, orden = ?
+          WHERE id = ?
+        `, [diseno, limite, posicion, orden, catId], (updateErr) => {
+          updateCount++;
+          if (updateErr) {
+            hasError = true;
+            errMsg = updateErr.message;
+          }
+          if (updateCount === updates.length) {
+            if (hasError) {
+              return res.status(500).json({ error: errMsg });
+            }
+            res.json({ message: 'Categorías actualizadas en lote correctamente' });
+          }
+        });
+      } else {
+        updateCount++;
+        if (updateCount === updates.length) {
+          if (hasError) {
+            return res.status(500).json({ error: errMsg });
+          }
+          res.json({ message: 'Categorías actualizadas en lote correctamente' });
+        }
+      }
+    });
+  });
+});
+
 
 // --- Endpoint de Carga Genérica de Archivos (Imágenes, GIFs, Videos) ---
 app.post('/api/admin/subir-archivo', async (req, res) => {

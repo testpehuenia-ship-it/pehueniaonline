@@ -169,7 +169,9 @@ db.serialize(() => {
       nombre TEXT NOT NULL UNIQUE,
       slug TEXT NOT NULL UNIQUE,
       diseno_home TEXT DEFAULT 'grid', -- 'grid', 'carousel', 'list', 'featured', 'mosaic'
-      limite_home INTEGER DEFAULT 3
+      limite_home INTEGER DEFAULT 3,
+      posicion_home TEXT DEFAULT 'izquierda',
+      orden INTEGER DEFAULT 0
     )
   `);
 
@@ -178,6 +180,12 @@ db.serialize(() => {
     // Silenciar error si la columna ya existe
   });
   db.run("ALTER TABLE categorias ADD COLUMN limite_home INTEGER DEFAULT 3", (err) => {
+    // Silenciar error si la columna ya existe
+  });
+  db.run("ALTER TABLE categorias ADD COLUMN posicion_home TEXT DEFAULT 'izquierda'", (err) => {
+    // Silenciar error si la columna ya existe
+  });
+  db.run("ALTER TABLE categorias ADD COLUMN orden INTEGER DEFAULT 0", (err) => {
     // Silenciar error si la columna ya existe
   });
 
