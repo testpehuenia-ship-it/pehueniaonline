@@ -40,7 +40,12 @@ app.get('/api/test-fetch', async (req, res) => {
       htmlSnippet: text.substring(0, 1000)
     });
   } catch (err) {
-    res.json({ error: err.message, stack: err.stack });
+    res.json({ 
+      error: err.message, 
+      causeMessage: err.cause ? err.cause.message : null,
+      causeCode: err.cause ? err.cause.code : null,
+      stack: err.stack 
+    });
   }
 });
 
