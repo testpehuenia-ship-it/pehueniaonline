@@ -218,165 +218,207 @@ async function procesarCampana(campanaId) {
         let itemsAProcesar = feed.items.slice(0, campana.limite_por_ejecucion);
         let importados = 0;
 
-        for (const item of itemsAProcesar) {
-          // Verificar si ya existe por URL original
-          const existe = await new Promise((res) => {
-            db.get('SELECT id FROM noticias WHERE url_original = ? OR titulo = ?', [item.link, item.title], (err, row) => res(row));
-          });
-
-          if (existe) {
-            continue; // Saltar si ya existe
-          }
-
-          // Obtener el contenido original completo de content:encoded o content
-          let contenidoOriginal = item['content:encoded'] || item.content || item.contentSnippet || '';
-
-          // Helper para validar si un enlace es una imagen (e ignorar audios .mp3 u otros adjuntos)
-          const esImagenValida = (url, type) => {
-            if (!url) return false;
-            if (type && (type.startsWith('audio/') || type.startsWith('video/'))) return false;
-            const ext = url.split('?')[0].split('.').pop().toLowerCase();
-            return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp'].includes(ext) || (type && type.startsWith('image/'));
-          };
-
-          // Extraer imagen destacada (del feed o del primer <img> del contenido)
-          let imagenUrl = '';
-          const checkMediaItem = (m) => {
-            if (!m) return null;
-            if (m.$ && m.$.url && esImagenValida(m.$.url, m.$.type || m.$.medium)) return m.$.url;
-            if (m.url && esImagenValida(m.url, m.type || m.medium)) return m.url;
-            return null;
-          };
-
-          if (item.enclosure && item.enclosure.url && esImagenValida(item.enclosure.url, item.enclosure.type)) {
-            imagenUrl = item.enclosure.url;
-          } else if (item.mediaContent && item.mediaContent.url && esImagenValida(item.mediaContent.url, item.mediaContent.type)) {
-            imagenUrl = item.mediaContent.url;
-          } else if (item['media:content']) {
-            if (Array.isArray(item['media:content'])) {
-              for (const m of item['media:content']) {
-                const url = checkMediaItem(m);
-                if (url) { imagenUrl = url; break; }
-              }
-            } else {
-              imagenUrl = checkMediaItem(item['media:content']) || '';
-            }
-          }
-
-          if (!imagenUrl && item['media:thumbnail']) {
-            if (Array.isArray(item['media:thumbnail'])) {
-              for (const m of item['media:thumbnail']) {
-                const url = checkMediaItem(m);
-                if (url) { imagenUrl = url; break; }
-              }
-            } else {
-              imagenUrl = checkMediaItem(item['media:thumbnail']) || '';
-            }
-          }
-
-          if (!imagenUrl && item.image && item.image.url) {
-            imagenUrl = item.image.url;
-          }
-
-          if (!imagenUrl && contenidoOriginal) {
-            // Intentar buscar la primera etiqueta <img> en el contenido con cheerio
-            try {
-              const $ = cheerio.load(contenidoOriginal);
-              const firstImg = $('img').first();
-              if (firstImg.length) {
-                imagenUrl = firstImg.attr('src');
-                // Remover la primera imagen para que no aparezca duplicada en la vista de detalle
-                firstImg.remove();
-                contenidoOriginal = $.html();
-              }
-            } catch (imgErr) {
-              console.error('Error al extraer imagen con Cheerio:', imgErr);
-            }
-          }
-
-          // Fallback robusto: si no se encontró imagen en el feed, raspar la web original buscando og:image
-          if (!imagenUrl && item.link) {
-            try {
-              console.log(`Buscando og:image en la web original: ${item.link}`);
-              const responsePage = await fetch(item.link, {
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-                },
-                signal: AbortSignal.timeout(5000)
-              });
-              if (responsePage.ok) {
-                const htmlPage = await responsePage.text();
-                const $page = cheerio.load(htmlPage);
-                const scrapedImg = $page('meta[property="og:image"]').attr('content') 
-                  || $page('meta[name="twitter:image"]').attr('content')
-                  || $page('.wp-post-image').first().attr('src')
-                  || $page('article img').first().attr('src');
-                
-                if (scrapedImg && esImagenValida(scrapedImg)) {
-                  imagenUrl = scrapedImg;
-                  console.log(`Imagen destacada recuperada de og:image en web original: ${imagenUrl}`);
-                }
-              }
-            } catch (scrapeErr) {
-              console.error(`Error al raspar imagen destacada de la web original (${item.link}):`, scrapeErr.message);
-            }
-          }
-
-          // Quitar scripts e iframes nocivos del contenido para mantenerlo limpio, y resolver URLs de imágenes relativas
-          if (contenidoOriginal) {
-            try {
-              const $ = cheerio.load(contenidoOriginal);
-              $('script').remove();
-              $('iframe').remove();
-              
-              // Resolver y optimizar (convertir a WebP y comprimir) URLs de imágenes relativas dentro del contenido
-              $('img').each((i, el) => {
-                const src = $(el).attr('src');
-                if (src) {
-                  const absSrc = resolverUrlAbsoluta(src, item.link || campana.url_feed);
-                  $(el).attr('src', optimizarUrlImagen(absSrc));
-                }
-              });
-              
-              contenidoOriginal = $.html();
-            } catch (cleanErr) {
-              console.error('Error al limpiar marcado del contenido:', cleanErr);
-            }
-          }
-
-          // Resolver y optimizar (convertir a WebP y comprimir) URL de la imagen destacada para que sea absoluta
-          if (imagenUrl) {
-            imagenUrl = optimizarUrlImagen(resolverUrlAbsoluta(imagenUrl, item.link || campana.url_feed));
-          }
-
-          let tituloFinal = item.title;
-          let contenidoFinal = contenidoOriginal;
-
-          // Reformular con IA si está activado
-          if (campana.auto_reformular === 1) {
-            console.log(`Reformulando noticia: "${item.title}"`);
-            const reformulado = await reformularNoticia(item.title, contenidoOriginal, apiKey);
-            tituloFinal = reformulado.titulo;
-            contenidoFinal = reformulado.contenido;
-          }
-
-          // Establecer estado
-          const estadoNoticia = campana.auto_publicar === 1 ? 'publicado' : 'borrador';
-          const fechaNoticia = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
-
-          // Insertar en base de datos
-          await new Promise((res, rej) => {
-            db.run(`
-              INSERT INTO noticias (titulo, contenido, fecha, categoria_id, imagen_url, estado, url_original)
-              VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [tituloFinal, contenidoFinal, fechaNoticia, campana.categoria_id, imagenUrl, estadoNoticia, item.link], (err) => {
-              if (err) rej(err);
-              else res();
+        const promesas = itemsAProcesar.map(async (item) => {
+          try {
+            // Verificar si ya existe por URL original
+            const existe = await new Promise((res) => {
+              db.get('SELECT id FROM noticias WHERE url_original = ? OR titulo = ?', [item.link, item.title], (err, row) => res(row));
             });
-          });
 
-          importados++;
-        }
+            if (existe) {
+              return false; // Saltar si ya existe
+            }
+
+            // Obtener el contenido original completo de content:encoded o content
+            let contenidoOriginal = item['content:encoded'] || item.content || item.contentSnippet || '';
+
+            // Helper para validar si un enlace es una imagen (e ignorar audios .mp3 u otros adjuntos)
+            const esImagenValida = (url, type) => {
+              if (!url) return false;
+              if (type && (type.startsWith('audio/') || type.startsWith('video/'))) return false;
+              const ext = url.split('?')[0].split('.').pop().toLowerCase();
+              return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp'].includes(ext) || (type && type.startsWith('image/'));
+            };
+
+            // Extraer imagen destacada (del feed o del primer <img> del contenido)
+            let imagenUrl = '';
+            const checkMediaItem = (m) => {
+              if (!m) return null;
+              if (m.$ && m.$.url && esImagenValida(m.$.url, m.$.type || m.$.medium)) return m.$.url;
+              if (m.url && esImagenValida(m.url, m.type || m.medium)) return m.url;
+              return null;
+            };
+
+            if (item.enclosure && item.enclosure.url && esImagenValida(item.enclosure.url, item.enclosure.type)) {
+              imagenUrl = item.enclosure.url;
+            } else if (item.mediaContent && item.mediaContent.url && esImagenValida(item.mediaContent.url, item.mediaContent.type)) {
+              imagenUrl = item.mediaContent.url;
+            } else if (item['media:content']) {
+              if (Array.isArray(item['media:content'])) {
+                for (const m of item['media:content']) {
+                  const url = checkMediaItem(m);
+                  if (url) { imagenUrl = url; break; }
+                }
+              } else {
+                imagenUrl = checkMediaItem(item['media:content']) || '';
+              }
+            }
+
+            if (!imagenUrl && item['media:thumbnail']) {
+              if (Array.isArray(item['media:thumbnail'])) {
+                for (const m of item['media:thumbnail']) {
+                  const url = checkMediaItem(m);
+                  if (url) { imagenUrl = url; break; }
+                }
+              } else {
+                imagenUrl = checkMediaItem(item['media:thumbnail']) || '';
+              }
+            }
+
+            if (!imagenUrl && item.image && item.image.url) {
+              imagenUrl = item.image.url;
+            }
+
+            if (!imagenUrl && contenidoOriginal) {
+              // Intentar buscar la primera etiqueta <img> en el contenido con cheerio
+              try {
+                const $ = cheerio.load(contenidoOriginal);
+                const firstImg = $('img').first();
+                if (firstImg.length) {
+                  const src = firstImg.attr('src');
+                  // Evitar usar SVG placeholders
+                  if (src && !src.startsWith('data:image/')) {
+                    imagenUrl = src;
+                    firstImg.remove();
+                    contenidoOriginal = $.html();
+                  } else {
+                    // Si es un placeholder SVG, buscar si tiene atributos lazy-load
+                    const lazySrc = firstImg.attr('data-lazy-src') || firstImg.attr('data-src') || firstImg.attr('data-original');
+                    if (lazySrc) {
+                      imagenUrl = lazySrc;
+                      firstImg.remove();
+                      contenidoOriginal = $.html();
+                    }
+                  }
+                }
+              } catch (imgErr) {
+                console.error('Error al extraer imagen con Cheerio:', imgErr);
+              }
+            }
+
+            // Fallback robusto: si no se encontró imagen en el feed, raspar la web original buscando og:image
+            if (!imagenUrl && item.link) {
+              try {
+                console.log(`Buscando og:image en la web original: ${item.link}`);
+                const responsePage = await fetch(item.link, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+                  },
+                  signal: AbortSignal.timeout(15000)
+                });
+                if (responsePage.ok) {
+                  const htmlPage = await responsePage.text();
+                  const $page = cheerio.load(htmlPage);
+                  
+                  let scrapedImg = $page('meta[property="og:image"]').attr('content') 
+                    || $page('meta[name="twitter:image"]').attr('content');
+                    
+                  if (!scrapedImg) {
+                    const wpPostImg = $page('.wp-post-image').first();
+                    if (wpPostImg.length) {
+                      scrapedImg = wpPostImg.attr('data-lazy-src') 
+                        || wpPostImg.attr('data-src') 
+                        || wpPostImg.attr('data-original') 
+                        || wpPostImg.attr('src');
+                    }
+                  }
+                  
+                  if (!scrapedImg) {
+                    const firstArtImg = $page('article img').first();
+                    if (firstArtImg.length) {
+                      scrapedImg = firstArtImg.attr('data-lazy-src') 
+                        || firstArtImg.attr('data-src') 
+                        || firstArtImg.attr('data-original') 
+                        || firstArtImg.attr('src');
+                    }
+                  }
+                  
+                  if (scrapedImg && esImagenValida(scrapedImg)) {
+                    imagenUrl = scrapedImg;
+                    console.log(`Imagen destacada recuperada en web original: ${imagenUrl}`);
+                  }
+                }
+              } catch (scrapeErr) {
+                console.error(`Error al raspar imagen destacada de la web original (${item.link}):`, scrapeErr.message);
+              }
+            }
+
+            // Quitar scripts e iframes nocivos del contenido para mantenerlo limpio, y resolver URLs de imágenes relativas
+            if (contenidoOriginal) {
+              try {
+                const $ = cheerio.load(contenidoOriginal);
+                $('script').remove();
+                $('iframe').remove();
+                
+                // Resolver y optimizar (convertir a WebP y comprimir) URLs de imágenes relativas dentro del contenido
+                $('img').each((i, el) => {
+                  let src = $(el).attr('src');
+                  if (src && src.startsWith('data:image/')) {
+                    // Si es un SVG lazy load placeholder, intentar usar la real
+                    src = $(el).attr('data-lazy-src') || $(el).attr('data-src') || $(el).attr('data-original') || src;
+                  }
+                  if (src) {
+                    const absSrc = resolverUrlAbsoluta(src, item.link || campana.url_feed);
+                    $(el).attr('src', optimizarUrlImagen(absSrc));
+                  }
+                });
+                
+                contenidoOriginal = $.html();
+              } catch (cleanErr) {
+                console.error('Error al limpiar marcado del contenido:', cleanErr);
+              }
+            }
+
+            // Resolver y optimizar (convertir a WebP y comprimir) URL de la imagen destacada para que sea absoluta
+            if (imagenUrl) {
+              imagenUrl = optimizarUrlImagen(resolverUrlAbsoluta(imagenUrl, item.link || campana.url_feed));
+            }
+
+            let tituloFinal = item.title;
+            let contenidoFinal = contenidoOriginal;
+
+            // Reformular con IA si está activado
+            if (campana.auto_reformular === 1) {
+              console.log(`Reformulando noticia: "${item.title}"`);
+              const reformulado = await reformularNoticia(item.title, contenidoOriginal, apiKey);
+              tituloFinal = reformulado.titulo;
+              contenidoFinal = reformulado.contenido;
+            }
+
+            // Establecer estado
+            const estadoNoticia = campana.auto_publicar === 1 ? 'publicado' : 'borrador';
+            const fechaNoticia = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
+
+            // Insertar en base de datos
+            await new Promise((res, rej) => {
+              db.run(`
+                INSERT INTO noticias (titulo, contenido, fecha, categoria_id, imagen_url, estado, url_original)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+              `, [tituloFinal, contenidoFinal, fechaNoticia, campana.categoria_id, imagenUrl, estadoNoticia, item.link], (err) => {
+                if (err) rej(err);
+                else res();
+              });
+            });
+
+            return true;
+          } catch (itemErr) {
+            console.error(`Error al procesar el artículo "${item.title}":`, itemErr.message);
+            return false;
+          }
+        });
+
+        const resultados = await Promise.all(promesas);
+        importados = resultados.filter(Boolean).length;
 
         // Actualizar la última fecha de ejecución de la campaña
         const ahora = new Date().toISOString();

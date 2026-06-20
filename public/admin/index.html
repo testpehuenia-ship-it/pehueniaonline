@@ -145,16 +145,47 @@
               <i class="fa-solid fa-plus"></i> Redactar Nueva Noticia
             </button>
           </div>
+
+          <!-- Barra de Filtros -->
+          <div class="filters-bar" style="margin: 15px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+            <div class="filter-group" style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="filtro-noticia-categoria" style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary);">Filtrar por Categoría</label>
+              <select id="filtro-noticia-categoria" class="form-control" style="padding: 6px 10px; font-size: 0.8rem; height: 36px;">
+                <option value="">Todas las Categorías</option>
+              </select>
+            </div>
+            
+            <div class="filter-group" style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="filtro-noticia-estado" style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary);">Filtrar por Estado</label>
+              <select id="filtro-noticia-estado" class="form-control" style="padding: 6px 10px; font-size: 0.8rem; height: 36px;">
+                <option value="">Todos los Estados</option>
+                <option value="publicado">Publicado</option>
+                <option value="borrador">Borrador</option>
+              </select>
+            </div>
+
+            <div class="filter-group" style="display: flex; flex-direction: column; gap: 4px;">
+              <label for="filtro-noticia-fecha" style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary);">Filtrar por Fecha</label>
+              <input type="date" id="filtro-noticia-fecha" class="form-control" style="padding: 6px 10px; font-size: 0.8rem; height: 36px;">
+            </div>
+
+            <div class="filter-group" style="display: flex; flex-direction: column; justify-content: flex-end;">
+              <button type="button" class="btn btn-secondary" id="btn-limpiar-filtros" style="padding: 6px 10px; font-size: 0.8rem; height: 36px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--border-color);">
+                <i class="fa-solid fa-filter-circle-xmark"></i> Limpiar Filtros
+              </button>
+            </div>
+          </div>
+
           <div class="table-wrapper">
             <table class="admin-table">
               <thead>
                 <tr>
                   <th>Título</th>
-                  <th>Categoría</th>
-                  <th>Fecha</th>
-                  <th>Visitas</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
+                  <th id="header-noticia-categoria" style="cursor:pointer; user-select:none; width: 180px;">Categoría <i class="fa-solid fa-sort"></i></th>
+                  <th id="header-noticia-fecha" style="cursor:pointer; user-select:none; width: 150px;">Fecha <i class="fa-solid fa-sort-down"></i></th>
+                  <th style="width: 100px;">Visitas</th>
+                  <th style="width: 120px;">Estado</th>
+                  <th style="width: 120px; text-align: center;">Acciones</th>
                 </tr>
               </thead>
               <tbody id="noticias-table-body">

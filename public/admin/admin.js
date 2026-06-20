@@ -4,6 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Estado
   let categorias = [];
   let appConfigs = {};
+  let todasLasNoticias = [];
+  let noticiasFiltros = {
+    categoria: '',
+    estado: '',
+    fecha: ''
+  };
+  let noticiasOrden = {
+    columna: 'fecha',
+    direccion: 'desc'
+  };
 
   // Elementos
   const el = {
@@ -85,7 +95,15 @@ document.addEventListener('DOMContentLoaded', () => {
     catConfigDiseno: document.getElementById('cat-config-diseno'),
     catConfigLimite: document.getElementById('cat-config-limite'),
     catConfigPosicion: document.getElementById('cat-config-posicion'),
-    catConfigOrden: document.getElementById('cat-config-orden')
+    catConfigOrden: document.getElementById('cat-config-orden'),
+
+    // Filtros de Noticias elements
+    filtroNoticiaCategoria: document.getElementById('filtro-noticia-categoria'),
+    filtroNoticiaEstado: document.getElementById('filtro-noticia-estado'),
+    filtroNoticiaFecha: document.getElementById('filtro-noticia-fecha'),
+    btnLimpiarFiltros: document.getElementById('btn-limpiar-filtros'),
+    headerNoticiaCategoria: document.getElementById('header-noticia-categoria'),
+    headerNoticiaFecha: document.getElementById('header-noticia-fecha')
   };
 
   // ==========================================
@@ -159,6 +177,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Categorías Config
     el.formCategoriaConfig.addEventListener('submit', guardarCategoriaConfig);
+
+    // Eventos de Filtrado de Noticias
+    if (el.filtroNoticiaCategoria) {
+      el.filtroNoticiaCategoria.addEventListener('change', (e) => {
+        noticiasFiltros.categoria = e.target.value;
+        renderNoticiasFiltradasYOrdenadas();
+      });
+    }
+    if (el.filtroNoticiaEstado) {
+      el.filtroNoticiaEstado.addEventListener('change', (e) => {
+        noticiasFiltros.estado = e.target.value;
+        renderNoticiasFiltradasYOrdenadas();
+      });
+    }
+    if (el.filtroNoticiaFecha) {
+      el.filtroNoticiaFecha.addEventListener('input', (e) => {
+        noticiasFiltros.fecha = e.target.value;
+        renderNoticiasFiltradasYOrdenadas();
+      });
+    }
+    if (el.btnLimpiarFiltros) {
+      el.btnLimpiarFiltros.addEventListener('click', () => {
+        if (el.filtroNoticiaCategoria) el.filtroNoticiaCategoria.value = '';
+        if (el.filtroNoticiaEstado) el.filtroNoticiaEstado.value = '';
+        if (el.filtroNoticiaFecha) el.filtroNoticiaFecha.value = '';
+        noticiasFiltros.categoria = '';
+        noticiasFiltros.estado = '';
+        noticiasFiltros.fecha = '';
+        renderNoticiasFiltradasYOrdenadas();
+      });
+    }
+
+    // Eventos de Ordenación de Noticias
+    if (el.headerNoticiaCategoria) {
+      el.headerNoticiaCategoria.addEventListener('click', () => {
+        if (noticiasOrden.columna === 'categoria') {
+          noticiasOrden.direccion = noticiasOrden.direccion === 'asc' ? 'desc' : 'asc';
+        } else {
+          noticiasOrden.columna = 'categoria';
+          noticiasOrden.direccion = 'asc';
+        }
+        actualizarIconosOrdenNoticias();
+        renderNoticiasFiltradasYOrdenadas();
+      });
+    }
+    if (el.headerNoticiaFecha) {
+      el.headerNoticiaFecha.addEventListener('click', () => {
+        if (noticiasOrden.columna === 'fecha') {
+          noticiasOrden.direccion = noticiasOrden.direccion === 'asc' ? 'desc' : 'asc';
+        } else {
+          noticiasOrden.columna = 'fecha';
+          noticiasOrden.direccion = 'desc';
+        }
+        actualizarIconosOrdenNoticias();
+        renderNoticiasFiltradasYOrdenadas();
+      });
+    }
   }
 
   function switchTab(tabName) {
@@ -252,6 +327,16 @@ document.addEventListener('DOMContentLoaded', () => {
         option.textContent = cat.nombre;
         el.noticiaCategoria.appendChild(option);
       });
+
+      if (el.filtroNoticiaCategoria) {
+        el.filtroNoticiaCategoria.innerHTML = '<option value="">Todas las Categorías</option>';
+        categorias.forEach(cat => {
+          const option = document.createElement('option');
+          option.value = cat.id;
+          option.textContent = cat.nombre;
+          el.filtroNoticiaCategoria.appendChild(option);
+        });
+      }
     } catch (e) {
       console.error('Error al cargar categorías');
     }
@@ -297,41 +382,110 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchNoticiasList() {
     try {
       const res = await fetch('/api/admin/noticias?_t=' + Date.now());
-      const noticias = await res.json();
-      
-      el.noticiasTableBody.innerHTML = '';
-      if (noticias.length === 0) {
-        el.noticiasTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No hay noticias registradas.</td></tr>';
-        return;
-      }
-
-      noticias.forEach(n => {
-        const tr = document.createElement('tr');
-        const fecha = new Date(n.fecha).toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        
-        const badgeClass = n.estado === 'publicado' ? 'badge-published' : 'badge-draft';
-        const badgeLabel = n.estado === 'publicado' ? 'Publicado' : 'Borrador';
-
-        tr.innerHTML = `
-          <td style="font-weight:600">${n.titulo}</td>
-          <td>${n.categoria_nombre}</td>
-          <td>${fecha}</td>
-          <td><i class="fa-regular fa-eye"></i> ${n.visitas}</td>
-          <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
-          <td>
-            <button class="btn btn-outline btn-editar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-regular fa-pen-to-square"></i></button>
-            <button class="btn btn-danger btn-eliminar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-regular fa-trash-can"></i></button>
-          </td>
-        `;
-
-        tr.querySelector('.btn-editar').addEventListener('click', () => abrirModalNoticia(n));
-        tr.querySelector('.btn-eliminar').addEventListener('click', () => eliminarNoticia(n.id));
-
-        el.noticiasTableBody.appendChild(tr);
-      });
+      todasLasNoticias = await res.json();
+      renderNoticiasFiltradasYOrdenadas();
     } catch (e) {
       el.noticiasTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--color-danger)">Error al cargar noticias.</td></tr>';
     }
+  }
+
+  function actualizarIconosOrdenNoticias() {
+    const iconCat = el.headerNoticiaCategoria.querySelector('i');
+    const iconFecha = el.headerNoticiaFecha.querySelector('i');
+    
+    iconCat.className = 'fa-solid fa-sort';
+    iconFecha.className = 'fa-solid fa-sort';
+    
+    if (noticiasOrden.columna === 'categoria') {
+      if (noticiasOrden.direccion === 'asc') {
+        iconCat.className = 'fa-solid fa-sort-up';
+      } else {
+        iconCat.className = 'fa-solid fa-sort-down';
+      }
+    } else if (noticiasOrden.columna === 'fecha') {
+      if (noticiasOrden.direccion === 'asc') {
+        iconFecha.className = 'fa-solid fa-sort-up';
+      } else {
+        iconFecha.className = 'fa-solid fa-sort-down';
+      }
+    }
+  }
+
+  function renderNoticiasFiltradasYOrdenadas() {
+    let filtradas = [...todasLasNoticias];
+    
+    // Filtrar por categoría
+    if (noticiasFiltros.categoria) {
+      filtradas = filtradas.filter(n => String(n.categoria_id) === String(noticiasFiltros.categoria));
+    }
+    
+    // Filtrar por estado
+    if (noticiasFiltros.estado) {
+      filtradas = filtradas.filter(n => n.estado === noticiasFiltros.estado);
+    }
+    
+    // Filtrar por fecha (YYYY-MM-DD)
+    if (noticiasFiltros.fecha) {
+      const filtroFechaStr = noticiasFiltros.fecha;
+      filtradas = filtradas.filter(n => {
+        if (!n.fecha) return false;
+        return n.fecha.substring(0, 10) === filtroFechaStr;
+      });
+    }
+    
+    // Ordenar
+    filtradas.sort((a, b) => {
+      let valorA, valorB;
+      
+      if (noticiasOrden.columna === 'categoria') {
+        valorA = (a.categoria_nombre || '').toLowerCase();
+        valorB = (b.categoria_nombre || '').toLowerCase();
+      } else {
+        // Por defecto fecha
+        valorA = a.fecha ? new Date(a.fecha).getTime() : 0;
+        valorB = b.fecha ? new Date(b.fecha).getTime() : 0;
+      }
+      
+      if (valorA < valorB) {
+        return noticiasOrden.direccion === 'asc' ? -1 : 1;
+      }
+      if (valorA > valorB) {
+        return noticiasOrden.direccion === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+    
+    // Renderizar
+    el.noticiasTableBody.innerHTML = '';
+    if (filtradas.length === 0) {
+      el.noticiasTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No se encontraron noticias que coincidan con los filtros.</td></tr>';
+      return;
+    }
+    
+    filtradas.forEach(n => {
+      const tr = document.createElement('tr');
+      const fecha = new Date(n.fecha).toLocaleDateString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      
+      const badgeClass = n.estado === 'publicado' ? 'badge-published' : 'badge-draft';
+      const badgeLabel = n.estado === 'publicado' ? 'Publicado' : 'Borrador';
+
+      tr.innerHTML = `
+        <td style="font-weight:600">${n.titulo}</td>
+        <td>${n.categoria_nombre}</td>
+        <td>${fecha}</td>
+        <td><i class="fa-regular fa-eye"></i> ${n.visitas}</td>
+        <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+        <td>
+          <button class="btn btn-outline btn-editar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-regular fa-pen-to-square"></i></button>
+          <button class="btn btn-danger btn-eliminar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-regular fa-trash-can"></i></button>
+        </td>
+      `;
+
+      tr.querySelector('.btn-editar').addEventListener('click', () => abrirModalNoticia(n));
+      tr.querySelector('.btn-eliminar').addEventListener('click', () => eliminarNoticia(n.id));
+
+      el.noticiasTableBody.appendChild(tr);
+    });
   }
 
   function abrirModalNoticia(noticia = null) {
