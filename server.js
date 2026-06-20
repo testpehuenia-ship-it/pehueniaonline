@@ -808,7 +808,7 @@ app.post('/api/admin/subir-imagen', async (req, res) => {
 
   try {
     // Limpiar el prefijo data:image/...;base64,
-    const matches = imagenBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    const matches = imagenBase64.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
       return res.status(400).json({ error: 'Formato base64 inválido' });
     }
@@ -1155,7 +1155,7 @@ app.post('/api/admin/subir-archivo', async (req, res) => {
   }
 
   try {
-    const matches = archivoBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    const matches = archivoBase64.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
       return res.status(400).json({ error: 'Formato base64 inválido' });
     }
