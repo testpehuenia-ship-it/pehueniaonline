@@ -352,6 +352,21 @@ async function procesarCampana(campanaId) {
                 } else {
                   throw new Error('Imagen no encontrada o inválida en raspado directo');
                 }
+
+                // Extraer el desarrollo de la noticia completo del cuerpo de la página
+                let bodyHtml = '';
+                const bodySelectors = ['.entry-content', '.post-content', '.entry-body', '.post-body', 'article', '.content'];
+                for (const selector of bodySelectors) {
+                  const element = $page(selector).first();
+                  if (element.length && element.text().trim().length > 100) {
+                    bodyHtml = element.html();
+                    break;
+                  }
+                }
+                if (bodyHtml) {
+                  contenidoOriginal = bodyHtml;
+                  console.log(`Cuerpo del artículo extraído con éxito de la web original (${item.link})`);
+                }
               } catch (scrapeErr) {
                 console.warn(`Error al raspar imagen directamente de ${item.link} (${scrapeErr.message}). Intentando vía Google Translate Proxy...`);
                 try {
@@ -383,6 +398,21 @@ async function procesarCampana(campanaId) {
                       imagenUrl = scrapedImg;
                       console.log(`Imagen destacada recuperada vía Google Translate Proxy: ${imagenUrl}`);
                     }
+
+                    // Extraer el desarrollo de la noticia completo del cuerpo de la página
+                    let bodyHtml = '';
+                    const bodySelectors = ['.entry-content', '.post-content', '.entry-body', '.post-body', 'article', '.content'];
+                    for (const selector of bodySelectors) {
+                      const element = $page(selector).first();
+                      if (element.length && element.text().trim().length > 100) {
+                        bodyHtml = element.html();
+                        break;
+                      }
+                    }
+                    if (bodyHtml) {
+                      contenidoOriginal = bodyHtml;
+                      console.log(`Cuerpo del artículo extraído con éxito vía Google Translate Proxy (${item.link})`);
+                    }
                   }
                 } catch (proxyScrapeErr) {
                   console.error(`Error al raspar imagen vía Google Translate Proxy (${item.link}):`, proxyScrapeErr.message);
@@ -390,27 +420,37 @@ async function procesarCampana(campanaId) {
               }
             }
 
-            // Quitar scripts e iframes nocivos del contenido para mantenerlo limpio, y resolver URLs de imágenes relativas
+            // Quitar scripts, publicidades, imágenes y enlaces del contenido para mantenerlo limpio
             if (contenidoOriginal) {
               try {
                 const $ = cheerio.load(contenidoOriginal);
+                
+                // 1. Quitar scripts e iframes
                 $('script').remove();
                 $('iframe').remove();
                 
-                // Resolver y optimizar (convertir a WebP y comprimir) URLs de imágenes relativas dentro del contenido
-                $('img').each((i, el) => {
-                  let src = $(el).attr('src');
-                  if (src && src.startsWith('data:image/')) {
-                    // Si es un SVG lazy load placeholder, intentar usar la real
-                    src = $(el).attr('data-lazy-src') || $(el).attr('data-src') || $(el).attr('data-original') || src;
-                  }
-                  if (src) {
-                    const absSrc = resolverUrlAbsoluta(src, item.link || campana.url_feed);
-                    $(el).attr('src', optimizarUrlImagen(absSrc));
-                  }
+                // 2. Quitar anuncios y widgets comunes
+                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .wpcnt, .social-share, .jp-relatedposts').remove();
+                
+                // 3. Quitar imágenes internas del cuerpo (para dejar solo la imagen destacada principal)
+                $('img').remove();
+                
+                // 4. Convertir todos los hipervínculos <a> en texto plano
+                $('a').each((i, el) => {
+                  const text = $(el).text();
+                  $(el).replaceWith(text);
                 });
                 
-                contenidoOriginal = $.html();
+                // Obtener el HTML limpio
+                let cleanedHtml = $.html();
+                
+                // 5. Remover leyendas de "Seguir leyendo", firmas, etc. en el texto
+                cleanedHtml = cleanedHtml.replace(/<p[^>]*>La entrada.*?se publicó primero en.*?<\/p>/gi, '');
+                cleanedHtml = cleanedHtml.replace(/seguir leyendo/gi, '');
+                cleanedHtml = cleanedHtml.replace(/leer más/gi, '');
+                cleanedHtml = cleanedHtml.replace(/continúa leyendo/gi, '');
+                
+                contenidoOriginal = cleanedHtml.trim();
               } catch (cleanErr) {
                 console.error('Error al limpiar marcado del contenido:', cleanErr);
               }
