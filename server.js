@@ -538,8 +538,8 @@ async function procesarCampana(campanaId) {
                 $('script').remove();
                 $('iframe').remove();
                 
-                // 2. Quitar anuncios y widgets comunes
-                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .wpcnt, .social-share, .jp-relatedposts').remove();
+                // 2. Quitar anuncios, widgets comunes, bloques de compartir, etiquetas y posts relacionados
+                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .wpcnt, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container').remove();
                 
                 // 3. Quitar imágenes internas del cuerpo (para dejar solo la imagen destacada principal)
                 $('img').remove();
@@ -548,6 +548,24 @@ async function procesarCampana(campanaId) {
                 $('a').each((i, el) => {
                   const text = $(el).text();
                   $(el).replaceWith(text);
+                });
+
+                // 4b. Eliminar de forma genérica cualquier párrafo o bloque corto que contenga "Lee también" o "Temas"
+                $('p, div, strong, span, h2, h3, h4').each((i, el) => {
+                  const text = $(el).text().trim();
+                  const textLower = text.toLowerCase();
+                  if (
+                    (textLower.startsWith('lee también') || textLower.startsWith('lee tambien')) && 
+                    text.length < 200
+                  ) {
+                    $(el).remove();
+                  }
+                  if (
+                    (textLower === 'temas' || textLower === 'temas:' || textLower.startsWith('temas ')) && 
+                    text.length < 200
+                  ) {
+                    $(el).remove();
+                  }
                 });
                 
                 // Obtener el HTML limpio
