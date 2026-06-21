@@ -22,33 +22,6 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Expires', '0');
   next();
 });
-
-app.get('/api/test-fetch', async (req, res) => {
-  const url = req.query.url || 'https://www.vidanimal.org.ar/por-que-jerarquizamos-a-los-demas-animales/';
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-      },
-      signal: AbortSignal.timeout(15000)
-    });
-    const text = await response.text();
-    res.json({
-      status: response.status,
-      ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries()),
-      htmlSnippet: text.substring(0, 1000)
-    });
-  } catch (err) {
-    res.json({ 
-      error: err.message, 
-      causeMessage: err.cause ? err.cause.message : null,
-      causeCode: err.cause ? err.cause.code : null,
-      stack: err.stack 
-    });
-  }
-});
-
 // Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
