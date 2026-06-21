@@ -183,39 +183,104 @@ async function procesarCampana(campanaId) {
         });
         const apiKey = apiKeyRow ? apiKeyRow.valor : '';
 
-        // Parsear el feed RSS (con fallback a proxy si falla por bloqueo de IP/firewall)
+        // Parsear el feed RSS (con fallback a proxy si falla por bloqueo de IP/firewall, o detección de página HTML para raspado directo)
         let feed;
+        let esPaginaHtml = false;
+        
         try {
-          feed = await parser.parseURL(campana.url_feed);
+          // Si la URL no parece un feed tradicional, la tratamos como HTML directamente
+          if (!campana.url_feed.includes('/feed') && !campana.url_feed.includes('rss') && !campana.url_feed.endsWith('.xml')) {
+            esPaginaHtml = true;
+          } else {
+            feed = await parser.parseURL(campana.url_feed);
+          }
         } catch (parserErr) {
-          console.warn(`Error al conectar con ${campana.url_feed} directamente, intentando fallback vía rss2json...`);
+          console.warn(`Error al parsear como RSS feed (${campana.url_feed}), probando detección como página HTML...`);
+          esPaginaHtml = true;
+        }
+
+        if (esPaginaHtml) {
           try {
-            const proxyRes = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(campana.url_feed)}`);
-            if (proxyRes.ok) {
-              const data = await proxyRes.json();
-              if (data && data.status === 'ok') {
-                feed = {
-                  title: data.feed.title,
-                  link: data.feed.link,
-                  description: data.feed.description,
-                  items: data.items.map(item => ({
-                    title: item.title,
-                    link: item.link,
-                    pubDate: item.pubDate,
-                    content: item.content || item.description || '',
-                    'content:encoded': item.content || '',
-                    enclosure: item.enclosure && item.enclosure.link ? { url: item.enclosure.link, type: item.enclosure.type } : null
-                  }))
-                };
-              } else {
-                throw new Error(data.message || 'Formato de respuesta inválido');
-              }
-            } else {
-              throw new Error(`HTTP ${proxyRes.status}`);
+            console.log(`Raspando lista de artículos desde página HTML: ${campana.url_feed}`);
+            const responsePage = await fetch(campana.url_feed, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+              },
+              signal: AbortSignal.timeout(15000)
+            });
+            if (!responsePage.ok) {
+              throw new Error(`HTTP ${responsePage.status}`);
             }
-          } catch (proxyErr) {
-            console.error(`Fallback de proxy falló para ${campana.url_feed}:`, proxyErr.message);
-            throw parserErr; // Relanzar el error original si el fallback también falla
+            const htmlText = await responsePage.text();
+            const $html = cheerio.load(htmlText);
+            
+            const enlacesEncontrados = [];
+            $html('article a, h1 a, h2 a, h3 a, h4 a, .post-title a, .entry-title a, .card a, .noticia a, .c-news-card a, .c-news-list a').each((i, el) => {
+              const href = $html(el).attr('href');
+              const titulo = $html(el).text().trim();
+              
+              if (href && titulo && titulo.length > 15 && !href.includes('/category/') && !href.includes('/tag/') && !href.includes('/autor/')) {
+                const urlAbsoluta = resolverUrlAbsoluta(href, campana.url_feed);
+                if (!enlacesEncontrados.some(l => l.url === urlAbsoluta)) {
+                  enlacesEncontrados.push({ url: urlAbsoluta, title: titulo });
+                }
+              }
+            });
+
+            if (enlacesEncontrados.length === 0) {
+              throw new Error('No se encontraron artículos/enlaces en la página HTML.');
+            }
+
+            console.log(`Se detectaron ${enlacesEncontrados.length} artículos en la página HTML.`);
+            feed = {
+              title: $html('title').first().text().trim() || 'Página HTML Raspada',
+              link: campana.url_feed,
+              description: '',
+              items: enlacesEncontrados.map(l => ({
+                title: l.title,
+                link: l.url,
+                pubDate: new Date().toISOString(),
+                content: '',
+                'content:encoded': '',
+                contentSnippet: ''
+              }))
+            };
+          } catch (htmlErr) {
+            console.error(`Error al raspar página HTML (${campana.url_feed}):`, htmlErr.message);
+            // Intentar fallback tradicional como última opción
+            try {
+              feed = await parser.parseURL(campana.url_feed);
+            } catch (fallbackErr) {
+              console.warn(`Error al conectar con ${campana.url_feed} directamente, intentando fallback vía rss2json...`);
+              try {
+                const proxyRes = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(campana.url_feed)}`);
+                if (proxyRes.ok) {
+                  const data = await proxyRes.json();
+                  if (data && data.status === 'ok') {
+                    feed = {
+                      title: data.feed.title,
+                      link: data.feed.link,
+                      description: data.feed.description,
+                      items: data.items.map(item => ({
+                        title: item.title,
+                        link: item.link,
+                        pubDate: item.pubDate,
+                        content: item.content || item.description || '',
+                        'content:encoded': item.content || '',
+                        enclosure: item.enclosure && item.enclosure.link ? { url: item.enclosure.link, type: item.enclosure.type } : null
+                      }))
+                    };
+                  } else {
+                    throw new Error(data.message || 'Formato de respuesta inválido');
+                  }
+                } else {
+                  throw new Error(`HTTP ${proxyRes.status}`);
+                }
+              } catch (proxyErr) {
+                console.error(`Fallback de proxy falló para ${campana.url_feed}:`, proxyErr.message);
+                throw fallbackErr;
+              }
+            }
           }
         }
         let itemsAProcesar = feed.items.slice(0, campana.limite_por_ejecucion);
@@ -375,6 +440,7 @@ async function procesarCampana(campanaId) {
                     '.cuerpo', 
                     '.nota-contenido', 
                     '.nota', 
+                    '.newsfull__body', 
                     'article', 
                     '.content'
                   ];
@@ -440,6 +506,7 @@ async function procesarCampana(campanaId) {
                         '.cuerpo', 
                         '.nota-contenido', 
                         '.nota', 
+                        '.newsfull__body', 
                         'article', 
                         '.content'
                       ];
