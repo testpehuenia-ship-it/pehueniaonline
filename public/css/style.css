@@ -1442,6 +1442,12 @@ img {
   grid-column: span 2;
 }
 
+@media (min-width: 769px) {
+  .posts-mosaic-layout .post-card:nth-child(1) .post-card-thumb {
+    height: 380px;
+  }
+}
+
 @media (max-width: 768px) {
   .posts-mosaic-layout {
     grid-template-columns: 1fr;

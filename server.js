@@ -146,6 +146,10 @@ function optimizarUrlImagen(url) {
   if (url.startsWith('/uploads/') || url.includes('wsrv.nl')) {
     return url;
   }
+  // Si es una imagen de vidanimal.org.ar, no la pasamos por el proxy wsrv.nl (bloquean proxies y da 404)
+  if (url.includes('vidanimal.org.ar')) {
+    return url;
+  }
   if (url.startsWith('http://') || url.startsWith('https://')) {
     // Redimensionar a un ancho máximo de 1000px y convertir a WebP con calidad del 80%
     return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=1000&output=webp&q=80`;
@@ -355,7 +359,20 @@ async function procesarCampana(campanaId) {
 
                 // Extraer el desarrollo de la noticia completo del cuerpo de la página
                 let bodyHtml = '';
-                const bodySelectors = ['.entry-content', '.post-content', '.entry-body', '.post-body', 'article', '.content'];
+                const bodySelectors = [
+                  '.entry-content', 
+                  '.post-content', 
+                  '.entry-body', 
+                  '.post-body', 
+                  '.noticia-contenido', 
+                  '.contenido', 
+                  '.cuerpo-noticia', 
+                  '.cuerpo', 
+                  '.nota-contenido', 
+                  '.nota', 
+                  'article', 
+                  '.content'
+                ];
                 for (const selector of bodySelectors) {
                   const element = $page(selector).first();
                   if (element.length && element.text().trim().length > 100) {
@@ -401,7 +418,20 @@ async function procesarCampana(campanaId) {
 
                     // Extraer el desarrollo de la noticia completo del cuerpo de la página
                     let bodyHtml = '';
-                    const bodySelectors = ['.entry-content', '.post-content', '.entry-body', '.post-body', 'article', '.content'];
+                    const bodySelectors = [
+                      '.entry-content', 
+                      '.post-content', 
+                      '.entry-body', 
+                      '.post-body', 
+                      '.noticia-contenido', 
+                      '.contenido', 
+                      '.cuerpo-noticia', 
+                      '.cuerpo', 
+                      '.nota-contenido', 
+                      '.nota', 
+                      'article', 
+                      '.content'
+                    ];
                     for (const selector of bodySelectors) {
                       const element = $page(selector).first();
                       if (element.length && element.text().trim().length > 100) {
