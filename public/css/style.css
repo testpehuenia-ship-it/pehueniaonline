@@ -2211,4 +2211,32 @@ img {
   }
 }
 
+/* ==========================================
+   Ajustes de barra lateral para diseños de categorías
+   ========================================== */
+.sidebar-widget .post-card-large-image img {
+  height: 180px;
+}
+
+.sidebar-widget .post-card-title-overlay {
+  height: 180px;
+}
+
+.sidebar-widget .post-card-title-overlay-content {
+  padding: 16px;
+}
+
+.sidebar-widget .post-card-title-overlay-title {
+  font-size: 1rem;
+}
+
+.sidebar-widget .posts-large-image-layout {
+  gap: 16px;
+}
+
+.sidebar-widget .posts-title-overlay-layout {
+  gap: 16px;
+}
+
+
 

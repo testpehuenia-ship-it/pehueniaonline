@@ -28,6 +28,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Almacén de tareas cron activas para poder cancelarlas/reiniciarlas
 const cronTasks = {};
 
+// Caché en memoria para configuraciones de categorías y publicidades en la nube (evitando latencia)
+let cachedCategoriasConfig = null;
+let cachedCategoriasConfigTime = 0;
+let cachedPublicidadesConfig = null;
+let cachedPublicidadesConfigTime = 0;
+const CACHE_TTL_MS = 60000; // 60 segundos
+
+
 // ==========================================
 // MOTOR DE REFORMULACIÓN (INTEGRACIÓN IA)
 // ==========================================
@@ -778,89 +786,108 @@ const reverseDisenoMap = {
 };
 
 // Obtener todas las categorías (sincronizando con almacén en la nube para persistencia serverless)
+async function getCategoriasConfigFromCloud() {
+  const now = Date.now();
+  if (cachedCategoriasConfig && (now - cachedCategoriasConfigTime < CACHE_TTL_MS)) {
+    return cachedCategoriasConfig;
+  }
+
+  let cloudConfig = {};
+  let format = 'new';
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+    
+    const kvRes = await fetch('https://keyvalue.immanuel.co/api/KeyVal/GetValue/nwoxgbkq/categorias_config', {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (kvRes.ok) {
+      const text = await kvRes.text();
+      if (text) {
+        const hexClean = text.replace(/"/g, '').trim();
+        if (hexClean) {
+          const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
+
+          if (decodedString.trim().startsWith('{')) {
+            try {
+              cloudConfig = JSON.parse(decodedString);
+              format = 'old';
+            } catch (e) {
+              console.error('Error parsing old format JSON in getCategoriasConfigFromCloud:', e.message);
+            }
+          } else {
+            // New format: id:disenoShort:limite:posicionShort:orden
+            const parsedConfig = {};
+            decodedString.split(',').forEach(item => {
+              const parts = item.split(':');
+              if (parts.length >= 3) {
+                const catId = parseInt(parts[0], 10);
+                const disenoShort = parts[1];
+                const limite = parseInt(parts[2], 10);
+                const posShort = parts[3] || 'i';
+                const ordVal = parseInt(parts[4], 10) || 0;
+                if (!isNaN(catId)) {
+                  parsedConfig[catId] = {
+                    diseno_home: reverseDisenoMap[disenoShort] || 'grid',
+                    limite_home: limite,
+                    posicion_home: posShort === 'd' ? 'derecha' : 'izquierda',
+                    orden: ordVal
+                  };
+                }
+              }
+            });
+            cloudConfig = parsedConfig;
+            format = 'new';
+          }
+          cachedCategoriasConfig = { format, data: cloudConfig };
+          cachedCategoriasConfigTime = now;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error al recuperar configuración de categorías desde la nube:', e.message);
+  }
+  return cachedCategoriasConfig || { format: 'new', data: {} };
+}
+
+// Obtener todas las categorías (sincronizando con almacén en la nube para persistencia serverless)
 app.get('/api/categorias', (req, res) => {
   db.all('SELECT * FROM categorias', async (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
     try {
-      // Intentar recuperar configuraciones de diseño en la nube (evitando problemas de stateless en Vercel)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
-      
-      const kvRes = await fetch('https://keyvalue.immanuel.co/api/KeyVal/GetValue/nwoxgbkq/categorias_config', {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      const cloudConfigWrapper = await getCategoriasConfigFromCloud();
+      const isOldFormat = cloudConfigWrapper.format === 'old';
+      const cloudData = cloudConfigWrapper.data;
 
-      if (kvRes.ok) {
-        const text = await kvRes.text();
-        if (text) {
-          const hexClean = text.replace(/"/g, '').trim();
-          if (hexClean) {
-            const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
-            
-            let cloudConfig = {};
-            let isOldFormat = false;
-
-            if (decodedString.trim().startsWith('{')) {
-              try {
-                cloudConfig = JSON.parse(decodedString);
-                isOldFormat = true;
-              } catch (e) {
-                console.error('Error parsing old format JSON in GET:', e.message);
-              }
-            } else {
-              // New format: id:disenoShort:limite:posicionShort:orden
-              decodedString.split(',').forEach(item => {
-                const parts = item.split(':');
-                if (parts.length >= 3) {
-                  const catId = parseInt(parts[0], 10);
-                  const disenoShort = parts[1];
-                  const limite = parseInt(parts[2], 10);
-                  const posShort = parts[3] || 'i';
-                  const ordVal = parseInt(parts[4], 10) || 0;
-                  if (!isNaN(catId)) {
-                    cloudConfig[catId] = {
-                      diseno_home: reverseDisenoMap[disenoShort] || 'grid',
-                      limite_home: limite,
-                      posicion_home: posShort === 'd' ? 'derecha' : 'izquierda',
-                      orden: ordVal
-                    };
-                  }
-                }
-              });
-            }
-
-            // Mezclar configuraciones de la nube en los registros locales
-            rows = rows.map(row => {
-              if (isOldFormat) {
-                const config = cloudConfig[row.slug] || cloudConfig[row.nombre];
-                if (config) {
-                  return {
-                    ...row,
-                    diseno_home: config.diseno_home || row.diseno_home,
-                    limite_home: config.limite_home || row.limite_home,
-                    posicion_home: config.posicion_home || row.posicion_home || 'izquierda',
-                    orden: config.orden !== undefined ? config.orden : (row.orden || 0)
-                  };
-                }
-              } else {
-                const config = cloudConfig[row.id];
-                if (config) {
-                  return {
-                    ...row,
-                    diseno_home: config.diseno_home || row.diseno_home,
-                    limite_home: config.limite_home || row.limite_home,
-                    posicion_home: config.posicion_home || row.posicion_home || 'izquierda',
-                    orden: config.orden !== undefined ? config.orden : (row.orden || 0)
-                  };
-                }
-              }
-              return row;
-            });
+      rows = rows.map(row => {
+        if (isOldFormat) {
+          const config = cloudData[row.slug] || cloudData[row.nombre];
+          if (config) {
+            return {
+              ...row,
+              diseno_home: config.diseno_home || row.diseno_home,
+              limite_home: config.limite_home || row.limite_home,
+              posicion_home: config.posicion_home || row.posicion_home || 'izquierda',
+              orden: config.orden !== undefined ? config.orden : (row.orden || 0)
+            };
+          }
+        } else {
+          const config = cloudData[row.id];
+          if (config) {
+            return {
+              ...row,
+              diseno_home: config.diseno_home || row.diseno_home,
+              limite_home: config.limite_home || row.limite_home,
+              posicion_home: config.posicion_home || row.posicion_home || 'izquierda',
+              orden: config.orden !== undefined ? config.orden : (row.orden || 0)
+            };
           }
         }
-      }
+        return row;
+      });
     } catch (e) {
       console.error('Error al sincronizar categorías con la nube:', e.message);
     }
@@ -868,6 +895,7 @@ app.get('/api/categorias', (req, res) => {
     res.json(rows);
   });
 });
+
 
 // Obtener últimas noticias (publicadas)
 app.get('/api/noticias', (req, res) => {
@@ -1201,6 +1229,11 @@ async function savePublicidadesToCloud(ads) {
 }
 
 async function getPublicidadesFromCloud(sqliteRows) {
+  const now = Date.now();
+  if (cachedPublicidadesConfig && (now - cachedPublicidadesConfigTime < CACHE_TTL_MS)) {
+    return cachedPublicidadesConfig;
+  }
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
@@ -1215,7 +1248,10 @@ async function getPublicidadesFromCloud(sqliteRows) {
         const hexClean = text.replace(/"/g, '').trim();
         if (hexClean) {
           const decodedString = Buffer.from(hexClean, 'hex').toString('utf-8');
-          return JSON.parse(decodedString);
+          const parsed = JSON.parse(decodedString);
+          cachedPublicidadesConfig = parsed;
+          cachedPublicidadesConfigTime = now;
+          return parsed;
         }
       }
     }
@@ -1246,6 +1282,7 @@ app.get('/api/admin/publicidades', (req, res) => {
 
 // Crear publicidad
 app.post('/api/admin/publicidades', (req, res) => {
+  cachedPublicidadesConfig = null; // Invalida caché
   const { nombre, tipo, formato, url_archivo, url_destino, activo } = req.body;
   
   db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
@@ -1281,6 +1318,7 @@ app.post('/api/admin/publicidades', (req, res) => {
 
 // Actualizar publicidad
 app.put('/api/admin/publicidades/:id', (req, res) => {
+  cachedPublicidadesConfig = null; // Invalida caché
   const id = parseInt(req.params.id, 10);
   const { nombre, tipo, formato, url_archivo, url_destino, activo } = req.body;
   
@@ -1328,6 +1366,7 @@ app.put('/api/admin/publicidades/:id', (req, res) => {
 
 // Eliminar publicidad
 app.delete('/api/admin/publicidades/:id', (req, res) => {
+  cachedPublicidadesConfig = null; // Invalida caché
   const id = parseInt(req.params.id, 10);
   
   db.all('SELECT * FROM publicidades ORDER BY id DESC', async (err, rows) => {
@@ -1350,6 +1389,7 @@ app.delete('/api/admin/publicidades/:id', (req, res) => {
 
 // Actualizar configuración de diseño y límite de una categoría (guardando en SQLite y sincronizando con la nube)
 app.put('/api/admin/categorias/:id', (req, res) => {
+  cachedCategoriasConfig = null; // Invalida caché de categorías
   const id = parseInt(req.params.id, 10);
   const { diseno_home, limite_home, posicion_home, orden } = req.body;
   
@@ -1470,6 +1510,7 @@ app.put('/api/admin/categorias/:id', (req, res) => {
 
 // Endpoint bulk para actualizar configuraciones de categorías en lote (bulk)
 app.put('/api/admin/categorias-bulk', (req, res) => {
+  cachedCategoriasConfig = null; // Invalida caché de categorías
   const updates = req.body;
   if (!Array.isArray(updates)) {
     return res.status(400).json({ error: 'Payload must be an array of category updates.' });

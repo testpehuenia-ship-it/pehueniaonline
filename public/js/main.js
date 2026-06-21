@@ -67,6 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderClimaSemanal();
     renderFixtureMundial();
     renderSidebarCategoriesDynamically();
+
+    // Resolver ruta inicial según hash actual
+    handleRoute();
   }
 
   // ==========================================
@@ -129,6 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
+    // Escuchar cambios de ruta por hash
+    window.addEventListener('hashchange', handleRoute);
+
     // Navegación por links de categorías y secciones
     document.querySelectorAll('[data-category]').forEach(link => {
       link.addEventListener('click', (e) => {
@@ -139,18 +145,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cerrar todos los desplegables al seleccionar una categoría
         document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
         
-        // Manejar links activos
-        document.querySelectorAll('[data-category]').forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-
         if (category === 'home') {
-          showSection('home');
+          window.location.hash = '#/';
         } else if (category === 'quienes-somos') {
-          showQuienesSomos();
+          window.location.hash = '#/quienes-somos';
         } else if (category === 'contacto') {
-          showContacto();
+          window.location.hash = '#/contacto';
         } else {
-          showCategoryPage(category);
+          window.location.hash = '#/categoria/' + category;
         }
       });
     });
@@ -180,6 +182,52 @@ document.addEventListener('DOMContentLoaded', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function handleRoute() {
+    const hash = window.location.hash || '#/';
+    
+    // Quitar active de todos los links
+    document.querySelectorAll('[data-category]').forEach(l => l.classList.remove('active'));
+    document.querySelectorAll('.dropdown-trigger').forEach(l => l.classList.remove('active'));
+
+    // Restaurar SEO por defecto en caso de salir de un detalle
+    document.title = "PEHUENIA ONLINE - Noticias de Villa Pehuenia y Moquehue";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', "Diario digital de Villa Pehuenia y Moquehue. Noticias locales, provinciales, nacionales, deportes, clima e información turística.");
+    }
+
+    if (hash === '#/' || hash === '#') {
+      const homeLink = document.querySelector('[data-category="home"]');
+      if (homeLink) homeLink.classList.add('active');
+      showSection('home');
+    } else if (hash === '#/quienes-somos') {
+      const qsLink = document.querySelector('[data-category="quienes-somos"]');
+      if (qsLink) qsLink.classList.add('active');
+      showQuienesSomos();
+    } else if (hash === '#/contacto') {
+      const cLink = document.querySelector('[data-category="contacto"]');
+      if (cLink) cLink.classList.add('active');
+      showContacto();
+    } else if (hash.startsWith('#/categoria/')) {
+      const categorySlug = hash.replace('#/categoria/', '');
+      const catLink = document.querySelector(`[data-category="${categorySlug}"]`);
+      if (catLink) {
+        catLink.classList.add('active');
+        const parentDropdown = catLink.closest('.dropdown');
+        if (parentDropdown) {
+          const trigger = parentDropdown.querySelector('.dropdown-trigger');
+          if (trigger) trigger.classList.add('active');
+        }
+      }
+      showCategoryPage(categorySlug);
+    } else if (hash.startsWith('#/noticia/')) {
+      const noticiaId = hash.replace('#/noticia/', '');
+      showArticleDetail(noticiaId);
+    } else {
+      showSection('home');
+    }
+  }
+
   // ==========================================
   // CARGA DE DATOS DE API (FRONTEND)
   // ==========================================
@@ -199,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
       noticias.forEach(noticia => {
         const span = document.createElement('span');
         span.textContent = noticia.titulo;
-        span.addEventListener('click', () => showArticleDetail(noticia.id));
+        span.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
         elements.tickerTrack.appendChild(span);
       });
     } catch (error) {
@@ -263,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    item.addEventListener('click', () => showArticleDetail(noticia.id));
+    item.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
     return item;
   }
 
@@ -454,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
-      card.addEventListener('click', () => showArticleDetail(noticia.id));
+      card.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
       container.appendChild(card);
     });
   }
@@ -483,7 +531,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="post-list-meta">${fecha}</span>
         </div>
       `;
-      item.addEventListener('click', () => showArticleDetail(noticia.id));
+      item.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
       container.appendChild(item);
     });
   }
@@ -635,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
-      card.addEventListener('click', () => showArticleDetail(noticia.id));
+      card.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
       elements.gridCategoryPosts.appendChild(card);
     });
   }
@@ -650,12 +698,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) throw new Error();
       const noticia = await res.json();
       
+      // Actualizar SEO dinámicamente
+      document.title = `${noticia.titulo} | PEHUENIA ONLINE`;
+      const copete = noticia.copete || noticia.contenido.replace(/<[^>]*>/g, '').slice(0, 150) + '...';
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.setAttribute('content', copete);
+      }
+
       const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=800';
       const imagen = noticia.imagen_url || defaultImg;
       const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       
       let badgeHtml = noticia.url_original ? `<span class="editorial-tag"><a href="${noticia.url_original}" target="_blank"><i class="fa-solid fa-link"></i> Fuente Original</a></span>` : '';
-
+ 
       elements.articleDetailContent.innerHTML = `
         <div class="article-header">
           <div class="article-meta-top">
@@ -663,12 +719,17 @@ document.addEventListener('DOMContentLoaded', () => {
             ${badgeHtml}
           </div>
           <h1 class="article-title">${noticia.titulo}</h1>
-          <div class="article-meta-bottom">
-            <div class="article-author-info">
-              <i class="fa-regular fa-user"></i>
-              <span>${noticia.autor}</span>
+          <div class="article-meta-bottom" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+              <div class="article-author-info">
+                <i class="fa-regular fa-user"></i>
+                <span>${noticia.autor}</span>
+              </div>
+              <span><i class="fa-regular fa-calendar"></i> ${fecha} | Lecturas: ${noticia.visitas}</span>
             </div>
-            <span><i class="fa-regular fa-calendar"></i> ${fecha} | Lecturas: ${noticia.visitas}</span>
+            <button class="btn-share" id="btn-share-link" style="background-color: var(--color-orange); color: white; border: none; padding: 8px 16px; border-radius: var(--border-radius-sm); font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; transition: var(--transition-ease);">
+              <i class="fa-solid fa-share-nodes"></i> Compartir noticia
+            </button>
           </div>
         </div>
         
@@ -681,6 +742,22 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
       
+      // Configurar evento para copiar enlace
+      const shareBtn = elements.articleDetailContent.querySelector('#btn-share-link');
+      if (shareBtn) {
+        shareBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(window.location.href);
+          
+          const originalContent = shareBtn.innerHTML;
+          shareBtn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+          shareBtn.style.backgroundColor = '#2ec4b6';
+          setTimeout(() => {
+            shareBtn.innerHTML = originalContent;
+            shareBtn.style.backgroundColor = 'var(--color-orange)';
+          }, 2000);
+        });
+      }
+
       // Actualizar contadores del Home de forma transparente
       fetchNoticiasTicker();
     } catch (error) {
@@ -944,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
-    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    card.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
     return card;
   }
 
@@ -965,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="post-list-meta">${fecha}</span>
       </div>
     `;
-    item.addEventListener('click', () => showArticleDetail(noticia.id));
+    item.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
     return item;
   }
 
@@ -987,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
-    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    card.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
     return card;
   }
 
@@ -1009,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
-    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    card.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
     return card;
   }
 
@@ -1035,7 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
-    card.addEventListener('click', () => showArticleDetail(noticia.id));
+    card.addEventListener('click', () => { window.location.hash = '#/noticia/' + noticia.id; });
     return card;
   }
 
@@ -1325,32 +1402,49 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       container.style.display = 'block';
+      
+      const diseno = category.diseno_home || 'list';
+      let listClass = 'compact-posts-list';
+      if (diseno === 'large-image') {
+        listClass = 'posts-large-image-layout';
+      } else if (diseno === 'title-overlay') {
+        listClass = 'posts-title-overlay-layout';
+      }
+
       container.innerHTML = `
         <h3 class="widget-title"><i class="${iconClass || 'fa-solid fa-list-ul'}"></i> ${category.nombre}</h3>
-        <div class="compact-posts-list"></div>
+        <div class="${listClass}"></div>
       `;
       
-      const listContainer = container.querySelector('.compact-posts-list');
+      const listContainer = container.querySelector(`.${listClass}`);
       const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=150';
       
       noticias.forEach(n => {
-        const item = document.createElement('div');
-        item.className = 'compact-post-item';
-        
-        const imagen = n.imagen_url || defaultImg;
-        const fecha = new Date(n.fecha).toLocaleDateString('es-AR');
-        
-        item.innerHTML = `
-          <div class="compact-post-thumb">
-            <img src="${imagen}" alt="${n.titulo}">
-          </div>
-          <div class="compact-post-content">
-            <h4 class="compact-post-title">${n.titulo}</h4>
-            <span class="compact-post-meta">${fecha}</span>
-          </div>
-        `;
-        
-        item.addEventListener('click', () => showArticleDetail(n.id));
+        let item;
+        if (diseno === 'large-image') {
+          item = createPostLargeImageMarkup(n);
+        } else if (diseno === 'title-overlay') {
+          item = createPostTitleOverlayMarkup(n);
+        } else {
+          item = document.createElement('div');
+          item.className = 'compact-post-item';
+          
+          const imagen = n.imagen_url || defaultImg;
+          const fecha = new Date(n.fecha).toLocaleDateString('es-AR');
+          
+          item.innerHTML = `
+            <div class="compact-post-thumb">
+              <img src="${imagen}" alt="${n.titulo}">
+            </div>
+            <div class="compact-post-content">
+              <h4 class="compact-post-title">${n.titulo}</h4>
+              <span class="compact-post-meta">${fecha}</span>
+            </div>
+          `;
+          item.addEventListener('click', () => {
+            window.location.hash = '#/noticia/' + n.id;
+          });
+        }
         listContainer.appendChild(item);
       });
     } catch (err) {
