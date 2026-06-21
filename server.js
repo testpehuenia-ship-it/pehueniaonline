@@ -809,7 +809,7 @@ app.get('/api/diag', (req, res) => {
     databaseType: process.env.TURSO_DATABASE_URL ? 'Turso' : 'Local SQLite',
     hasDbUrl: !!process.env.TURSO_DATABASE_URL,
     hasAuthToken: !!process.env.TURSO_AUTH_TOKEN,
-    dbUrlPrefix: process.env.TURSO_DATABASE_URL ? process.env.TURSO_DATABASE_URL.substring(0, 15) : null
+    dbUrl: process.env.TURSO_DATABASE_URL
   });
 });
 
