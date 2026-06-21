@@ -309,10 +309,11 @@ async function procesarCampana(campanaId) {
               }
             }
 
-            // Fallback robusto: si no se encontró imagen en el feed, raspar la web original buscando og:image
-            if (!imagenUrl && item.link) {
+            // Fallback robusto y extracción de contenido: si no hay imagen destacada o si el contenido es insuficiente/muy corto (ej. solo contiene la figura/foto)
+            const tieneContenidoSuficiente = contenidoOriginal && contenidoOriginal.replace(/<[^>]*>/g, '').trim().length > 150;
+            if ((!imagenUrl || !tieneContenidoSuficiente) && item.link) {
               try {
-                console.log(`Buscando og:image en la web original: ${item.link}`);
+                console.log(`Buscando imagen/contenido en la web original: ${item.link}`);
                 const responsePage = await fetch(item.link, {
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
@@ -327,65 +328,70 @@ async function procesarCampana(campanaId) {
                 const htmlPage = await responsePage.text();
                 const $page = cheerio.load(htmlPage);
                 
-                let scrapedImg = $page('meta[property="og:image"]').attr('content') 
-                  || $page('meta[name="twitter:image"]').attr('content');
+                // 1. Si no tenemos imagen destacada, intentamos extraerla
+                if (!imagenUrl) {
+                  let scrapedImg = $page('meta[property="og:image"]').attr('content') 
+                    || $page('meta[name="twitter:image"]').attr('content');
+                    
+                  if (!scrapedImg) {
+                    const wpPostImg = $page('.wp-post-image').first();
+                    if (wpPostImg.length) {
+                      scrapedImg = wpPostImg.attr('data-lazy-src') 
+                        || wpPostImg.attr('data-src') 
+                        || wpPostImg.attr('data-original') 
+                        || wpPostImg.attr('src');
+                    }
+                  }
                   
-                if (!scrapedImg) {
-                  const wpPostImg = $page('.wp-post-image').first();
-                  if (wpPostImg.length) {
-                    scrapedImg = wpPostImg.attr('data-lazy-src') 
-                      || wpPostImg.attr('data-src') 
-                      || wpPostImg.attr('data-original') 
-                      || wpPostImg.attr('src');
+                  if (!scrapedImg) {
+                    const firstArtImg = $page('article img').first();
+                    if (firstArtImg.length) {
+                      scrapedImg = firstArtImg.attr('data-lazy-src') 
+                        || firstArtImg.attr('data-src') 
+                        || firstArtImg.attr('data-original') 
+                        || firstArtImg.attr('src');
+                    }
                   }
-                }
-                
-                if (!scrapedImg) {
-                  const firstArtImg = $page('article img').first();
-                  if (firstArtImg.length) {
-                    scrapedImg = firstArtImg.attr('data-lazy-src') 
-                      || firstArtImg.attr('data-src') 
-                      || firstArtImg.attr('data-original') 
-                      || firstArtImg.attr('src');
+                  
+                  if (scrapedImg && esImagenValida(scrapedImg)) {
+                    imagenUrl = scrapedImg;
+                    console.log(`Imagen destacada recuperada en web original: ${imagenUrl}`);
+                  } else {
+                    throw new Error('Imagen no encontrada o inválida en raspado directo');
                   }
-                }
-                
-                if (scrapedImg && esImagenValida(scrapedImg)) {
-                  imagenUrl = scrapedImg;
-                  console.log(`Imagen destacada recuperada en web original: ${imagenUrl}`);
-                } else {
-                  throw new Error('Imagen no encontrada o inválida en raspado directo');
                 }
 
-                // Extraer el desarrollo de la noticia completo del cuerpo de la página
-                let bodyHtml = '';
-                const bodySelectors = [
-                  '.entry-content', 
-                  '.post-content', 
-                  '.entry-body', 
-                  '.post-body', 
-                  '.noticia-contenido', 
-                  '.contenido', 
-                  '.cuerpo-noticia', 
-                  '.cuerpo', 
-                  '.nota-contenido', 
-                  '.nota', 
-                  'article', 
-                  '.content'
-                ];
-                for (const selector of bodySelectors) {
-                  const element = $page(selector).first();
-                  if (element.length && element.text().trim().length > 100) {
-                    bodyHtml = element.html();
-                    break;
+                // 2. Si no tenemos contenido suficiente, intentamos extraerlo
+                if (!tieneContenidoSuficiente) {
+                  let bodyHtml = '';
+                  const bodySelectors = [
+                    '.entry-content', 
+                    '.post-content', 
+                    '.entry-body', 
+                    '.post-body', 
+                    '.noticia-contenido', 
+                    '.contenido', 
+                    '.cuerpo-noticia', 
+                    '.cuerpo', 
+                    '.nota-contenido', 
+                    '.nota', 
+                    'article', 
+                    '.content'
+                  ];
+                  for (const selector of bodySelectors) {
+                    const element = $page(selector).first();
+                    if (element.length && element.text().trim().length > 100) {
+                      bodyHtml = element.html();
+                      break;
+                    }
+                  }
+                  if (bodyHtml) {
+                    contenidoOriginal = bodyHtml;
+                    console.log(`Cuerpo del artículo extraído con éxito de la web original (${item.link})`);
                   }
                 }
-                if (bodyHtml) {
-                  contenidoOriginal = bodyHtml;
-                  console.log(`Cuerpo del artículo extraído con éxito de la web original (${item.link})`);
-                }
               } catch (scrapeErr) {
-                console.warn(`Error al raspar imagen directamente de ${item.link} (${scrapeErr.message}). Intentando vía Google Translate Proxy...`);
+                console.warn(`Error al raspar directamente de ${item.link} (${scrapeErr.message}). Intentando vía Google Translate Proxy...`);
                 try {
                   const proxyUrl = `https://translate.google.com/translate?sl=es&tl=en&u=${encodeURIComponent(item.link)}`;
                   const responsePage = await fetch(proxyUrl, {
@@ -397,55 +403,61 @@ async function procesarCampana(campanaId) {
                   if (responsePage.ok) {
                     const htmlPage = await responsePage.text();
                     const $page = cheerio.load(htmlPage);
-                    let scrapedImg = $page('meta[property="og:image"]').attr('content') 
-                      || $page('meta[name="twitter:image"]').attr('content')
-                      || $page('meta[property="twitter:image"]').attr('content');
-                      
-                    if (!scrapedImg) {
-                      const wpPostImg = $page('.wp-post-image').first();
-                      if (wpPostImg.length) {
-                        scrapedImg = wpPostImg.attr('data-lazy-src') 
-                          || wpPostImg.attr('data-src') 
-                          || wpPostImg.attr('data-original') 
-                          || wpPostImg.attr('src');
+
+                    // 1. Si falta la imagen, buscarla vía proxy
+                    if (!imagenUrl) {
+                      let scrapedImg = $page('meta[property="og:image"]').attr('content') 
+                        || $page('meta[name="twitter:image"]').attr('content')
+                        || $page('meta[property="twitter:image"]').attr('content');
+                        
+                      if (!scrapedImg) {
+                        const wpPostImg = $page('.wp-post-image').first();
+                        if (wpPostImg.length) {
+                          scrapedImg = wpPostImg.attr('data-lazy-src') 
+                            || wpPostImg.attr('data-src') 
+                            || wpPostImg.attr('data-original') 
+                            || wpPostImg.attr('src');
+                        }
                       }
-                    }
-                    
-                    if (scrapedImg && esImagenValida(scrapedImg)) {
-                      imagenUrl = scrapedImg;
-                      console.log(`Imagen destacada recuperada vía Google Translate Proxy: ${imagenUrl}`);
+                      
+                      if (scrapedImg && esImagenValida(scrapedImg)) {
+                        imagenUrl = scrapedImg;
+                        console.log(`Imagen destacada recuperada vía Google Translate Proxy: ${imagenUrl}`);
+                      }
                     }
 
-                    // Extraer el desarrollo de la noticia completo del cuerpo de la página
-                    let bodyHtml = '';
-                    const bodySelectors = [
-                      '.entry-content', 
-                      '.post-content', 
-                      '.entry-body', 
-                      '.post-body', 
-                      '.noticia-contenido', 
-                      '.contenido', 
-                      '.cuerpo-noticia', 
-                      '.cuerpo', 
-                      '.nota-contenido', 
-                      '.nota', 
-                      'article', 
-                      '.content'
-                    ];
-                    for (const selector of bodySelectors) {
-                      const element = $page(selector).first();
-                      if (element.length && element.text().trim().length > 100) {
-                        bodyHtml = element.html();
-                        break;
+                    // 2. Si el contenido sigue siendo insuficiente, extraer el desarrollo
+                    if (!tieneContenidoSuficiente) {
+                      let bodyHtml = '';
+                      const bodySelectors = [
+                        '.entry-content', 
+                        '.post-content', 
+                        '.entry-body', 
+                        '.post-body', 
+                        '.noticia-contenido', 
+                        '.contenido', 
+                        '.cuerpo-noticia', 
+                        '.cuerpo', 
+                        '.nota-contenido', 
+                        '.nota', 
+                        'article', 
+                        '.content'
+                      ];
+                      for (const selector of bodySelectors) {
+                        const element = $page(selector).first();
+                        if (element.length && element.text().trim().length > 100) {
+                          bodyHtml = element.html();
+                          break;
+                        }
                       }
-                    }
-                    if (bodyHtml) {
-                      contenidoOriginal = bodyHtml;
-                      console.log(`Cuerpo del artículo extraído con éxito vía Google Translate Proxy (${item.link})`);
+                      if (bodyHtml) {
+                        contenidoOriginal = bodyHtml;
+                        console.log(`Cuerpo del artículo extraído con éxito vía Google Translate Proxy (${item.link})`);
+                      }
                     }
                   }
                 } catch (proxyScrapeErr) {
-                  console.error(`Error al raspar imagen vía Google Translate Proxy (${item.link}):`, proxyScrapeErr.message);
+                  console.error(`Error al raspar vía Google Translate Proxy (${item.link}):`, proxyScrapeErr.message);
                 }
               }
             }
