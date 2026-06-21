@@ -804,6 +804,15 @@ app.get('/api/noticias', (req, res) => {
   });
 });
 
+app.get('/api/diag', (req, res) => {
+  res.json({
+    databaseType: process.env.TURSO_DATABASE_URL ? 'Turso' : 'Local SQLite',
+    hasDbUrl: !!process.env.TURSO_DATABASE_URL,
+    hasAuthToken: !!process.env.TURSO_AUTH_TOKEN,
+    dbUrlPrefix: process.env.TURSO_DATABASE_URL ? process.env.TURSO_DATABASE_URL.substring(0, 15) : null
+  });
+});
+
 // Obtener una noticia por ID y registrar visita (lectura)
 app.get('/api/noticias/:id', (req, res) => {
   const id = req.params.id;
