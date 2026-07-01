@@ -470,7 +470,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const badgeLabel = n.estado === 'publicado' ? 'Publicado' : 'Borrador';
 
       tr.innerHTML = `
-        <td style="font-weight:600">${n.titulo}</td>
+        <td style="font-weight:600">
+          <a href="../#/noticia/${n.id}" target="_blank" style="color: var(--color-primary, #0f4c81); text-decoration: none; cursor: pointer;">
+            ${n.titulo}
+          </a>
+        </td>
         <td>${n.categoria_nombre}</td>
         <td>${fecha}</td>
         <td><i class="fa-regular fa-eye"></i> ${n.visitas}</td>

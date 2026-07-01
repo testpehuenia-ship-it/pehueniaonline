@@ -23,7 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
     sections: {
       home: document.getElementById('section-home'),
       category: document.getElementById('section-category'),
-      detail: document.getElementById('section-detail')
+      detail: document.getElementById('section-detail'),
+      feeds: document.getElementById('section-feeds')
     },
     tickerTrack: document.getElementById('breaking-ticker-track'),
     heroGrid: document.getElementById('hero-grid'),
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     categoryPageTitle: document.getElementById('category-page-title'),
     gridCategoryPosts: document.getElementById('grid-category-posts'),
     articleDetailContent: document.getElementById('article-detail-content'),
+    feedsListContainer: document.getElementById('feeds-list-container'),
     searchInput: document.getElementById('search-input'),
     searchButton: document.getElementById('search-button'),
     newsletterForm: document.getElementById('newsletter-form'),
@@ -151,6 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
           window.location.hash = '#/quienes-somos';
         } else if (category === 'contacto') {
           window.location.hash = '#/contacto';
+        } else if (category === 'feeds-rss') {
+          window.location.hash = '#/feeds-rss';
         } else {
           window.location.hash = '#/categoria/' + category;
         }
@@ -208,6 +212,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const cLink = document.querySelector('[data-category="contacto"]');
       if (cLink) cLink.classList.add('active');
       showContacto();
+    } else if (hash === '#/feeds-rss') {
+      const feedsLink = document.querySelector('[data-category="feeds-rss"]');
+      if (feedsLink) feedsLink.classList.add('active');
+      showFeedsRSSPage();
     } else if (hash.startsWith('#/categoria/')) {
       const categorySlug = hash.replace('#/categoria/', '');
       const catLink = document.querySelector(`[data-category="${categorySlug}"]`);
@@ -365,8 +373,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const sectionBlock = document.createElement('section');
         sectionBlock.className = `category-block cat-block-span-${span}`;
         
-        // Agregar título de categoría con detalle de acento naranja
-        sectionBlock.innerHTML = `<h2 class="category-title" style="border-left: 4px solid var(--color-orange); padding-left: 10px;">${cat.nombre}</h2>`;
+        sectionBlock.innerHTML = `<h2 class="category-title" style="border-left: 4px solid var(--color-orange); padding-left: 10px; cursor: pointer; display: inline-block; transition: var(--transition-ease); hover:opacity:0.8;">${cat.nombre}</h2>`;
+        
+        const titleEl = sectionBlock.querySelector('.category-title');
+        if (titleEl) {
+          titleEl.addEventListener('click', () => {
+            window.location.hash = '#/categoria/' + cat.slug;
+          });
+        }
 
         // Contenedor interno para los posts
         const postsContainer = document.createElement('div');
@@ -818,6 +832,73 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     }, 100);
+  }
+
+  // Feeds RSS
+  async function showFeedsRSSPage() {
+    showSection('feeds');
+    elements.feedsListContainer.innerHTML = '<div class="shimmer-placeholder" style="height:150px; width:100%"></div>';
+
+    try {
+      const catRes = await fetch('/api/categorias?_t=' + Date.now());
+      const categorias = await catRes.json();
+
+      if (!categorias || categorias.length === 0) {
+        elements.feedsListContainer.innerHTML = '<p class="text-muted">No se encontraron categorías disponibles.</p>';
+        return;
+      }
+
+      elements.feedsListContainer.innerHTML = '';
+      categorias.forEach(cat => {
+        const feedUrl = `${window.location.origin}/categoria/${cat.slug}/feed`;
+        
+        const card = document.createElement('div');
+        card.className = 'editorial-card';
+        card.style.cssText = 'display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--border-color); padding: 20px; border-radius: var(--border-radius-md); background-color: var(--bg-secondary); align-items: stretch; margin-bottom: 16px;';
+        
+        card.innerHTML = `
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 1.15rem; color: var(--text-dark); display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-rss" style="color: var(--color-orange);"></i> Feed: ${cat.nombre}
+            </h3>
+            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 12px;">
+              Canal de noticias de la categoría <strong>${cat.nombre}</strong> completo con imágenes y artículos completos.
+            </p>
+            <div class="feed-url-input-container" style="display: flex; gap: 8px; align-items: center; width: 100%;">
+              <input type="text" readonly value="${feedUrl}" style="flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); font-size: 0.85rem; background-color: var(--bg-primary); color: var(--text-dark); outline: none; font-family: monospace;" id="feed-input-${cat.slug}">
+              <button class="btn-copy-feed" data-slug="${cat.slug}" style="background-color: var(--color-orange); color: white; border: none; padding: 10px 16px; font-weight: 700; border-radius: var(--border-radius-sm); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: var(--transition-ease); white-space: nowrap; font-size: 0.85rem;">
+                <i class="fa-regular fa-copy"></i> Copiar URL
+              </button>
+            </div>
+          </div>
+        `;
+        
+        elements.feedsListContainer.appendChild(card);
+        
+        const copyBtn = card.querySelector(`.btn-copy-feed[data-slug="${cat.slug}"]`);
+        const inputEl = card.querySelector(`#feed-input-${cat.slug}`);
+        if (copyBtn && inputEl) {
+          copyBtn.addEventListener('click', () => {
+            inputEl.select();
+            inputEl.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(feedUrl).then(() => {
+              const origHtml = copyBtn.innerHTML;
+              copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+              copyBtn.style.backgroundColor = '#2ec4b6';
+              setTimeout(() => {
+                copyBtn.innerHTML = origHtml;
+                copyBtn.style.backgroundColor = 'var(--color-orange)';
+              }, 2000);
+            }).catch(err => {
+              console.error('Error al copiar URL: ', err);
+            });
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error loading feeds: ', error);
+      elements.feedsListContainer.innerHTML = '<p class="text-muted">Error al cargar los canales RSS.</p>';
+    }
   }
 
   // Búsqueda

@@ -40,7 +40,7 @@ const CACHE_TTL_MS = 60000; // 60 segundos
 // MOTOR DE REFORMULACIÓN (INTEGRACIÓN IA)
 // ==========================================
 
-async function reformularNoticia(tituloOriginal, contenidoOriginal, apiKey = '') {
+async function reformularNoticia(tituloOriginal, contenidoOriginal, apiKey = '', intento = 1) {
   const systemPrompt = `Eres un redactor de noticias profesional para el diario Pehuenia Online. Tu tarea es:
 1. Cambiar el título por uno más atractivo, limpio y moderno (estilo periodístico impecable, aplicando principios de curiosidad-contraste, evitando clickbait genérico).
 2. Reformular el desarrollo de la noticia para que sea más clara, fluida y con una redacción periodística elegante. El contenido devuelto en el campo "contenido" debe estar estructurado en párrafos envueltos en etiquetas HTML <p>...</p> para mantener el formato y separación adecuados.
@@ -108,6 +108,15 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
         }
       })
     });
+
+    if (response.status === 429) {
+      if (intento <= 3) {
+        const delay = intento * 5000; // 5s, 10s, 15s
+        console.warn(`Límite de cuota Gemini alcanzado (429) para "${tituloOriginal}". Reintentando intento ${intento}/3 en ${delay/1000}s...`);
+        await new Promise(res => setTimeout(res, delay));
+        return reformularNoticia(tituloOriginal, contenidoOriginal, apiKey, intento + 1);
+      }
+    }
 
     if (!response.ok) {
       throw new Error(`API de Gemini retornó estado: ${response.status}`);
@@ -294,7 +303,7 @@ async function procesarCampana(campanaId) {
         let itemsAProcesar = feed.items.slice(0, campana.limite_por_ejecucion);
         let importados = 0;
 
-        const promesas = itemsAProcesar.map(async (item) => {
+        for (const item of itemsAProcesar) {
           try {
             // Verificar si ya existe por URL original
             const existe = await new Promise((res) => {
@@ -302,7 +311,7 @@ async function procesarCampana(campanaId) {
             });
 
             if (existe) {
-              return false; // Saltar si ya existe
+              continue; // Saltar si ya existe
             }
 
             // Obtener el contenido original completo de content:encoded o content
@@ -382,8 +391,19 @@ async function procesarCampana(campanaId) {
               }
             }
 
-            // Fallback robusto y extracción de contenido: si no hay imagen destacada o si el contenido es insuficiente/muy corto (ej. solo contiene la figura/foto)
-            const tieneContenidoSuficiente = contenidoOriginal && contenidoOriginal.replace(/<[^>]*>/g, '').trim().length > 150;
+            // Fallback robusto y extracción de contenido: si no hay imagen destacada o si el contenido es insuficiente/muy corto (ej. solo contiene la figura/foto, la leyenda "sigue leyendo..." o viñetas cortas)
+            const contentTextClean = (contenidoOriginal || '').replace(/<[^>]*>/g, '').trim();
+            const esLista = (contenidoOriginal || '').trim().startsWith('<ul') || 
+                            (contenidoOriginal || '').trim().startsWith('<ol') || 
+                            (contenidoOriginal || '').includes('<li>');
+            const esIncompleto = (contenidoOriginal || '').includes("class='more'") || 
+                                 (contenidoOriginal || '').includes('class="more"') ||
+                                 contentTextClean.toLowerCase().includes('sigue leyendo') || 
+                                 contentTextClean.toLowerCase().includes('leer más') || 
+                                 contentTextClean.toLowerCase().includes('leer mas') || 
+                                 contentTextClean.endsWith('...') || 
+                                 contentTextClean.endsWith('…');
+            const tieneContenidoSuficiente = contenidoOriginal && contentTextClean.length > 400 && !esIncompleto && !esLista;
             if ((!imagenUrl || !tieneContenidoSuficiente) && item.link) {
               try {
                 console.log(`Buscando imagen/contenido en la web original: ${item.link}`);
@@ -438,6 +458,9 @@ async function procesarCampana(campanaId) {
                 if (!tieneContenidoSuficiente) {
                   let bodyHtml = '';
                   const bodySelectors = [
+                    '#cuerpo',
+                    '.StoryTextContainer',
+                    '.ms-article-content',
                     '.entry-content', 
                     '.post-content', 
                     '.entry-body', 
@@ -504,6 +527,9 @@ async function procesarCampana(campanaId) {
                     if (!tieneContenidoSuficiente) {
                       let bodyHtml = '';
                       const bodySelectors = [
+                        '#cuerpo',
+                        '.StoryTextContainer',
+                        '.ms-article-content',
                         '.entry-content', 
                         '.post-content', 
                         '.entry-body', 
@@ -547,7 +573,7 @@ async function procesarCampana(campanaId) {
                 $('iframe').remove();
                 
                 // 2. Quitar anuncios, widgets comunes, bloques de compartir, etiquetas y posts relacionados
-                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .wpcnt, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container').remove();
+                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .wpcnt, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container, .ms-apb, .ms-ap, .ad-calc-data, [data-msnt-label="Publicidad"], [class*="ms-apb"], [class*="ms-ap"], msnt-survey-promo, msnt-comments-promo, section[data-widget="image"], section.relatedContent, section[data-widget="related-content"], msnt-driver-rating-widget-skeleton, msnt-driver-rating-widget, .outstream_partner, #ms-piano_article-prebanner, .related-container, .Newsletter, .sponsorHead, .inner-card-m, .related-content, #newsletter-clarin, .comments, #taboola-below-article-thumbnails').remove();
                 
                 // 3. Quitar imágenes internas del cuerpo (para dejar solo la imagen destacada principal)
                 $('img').remove();
@@ -600,15 +626,17 @@ async function procesarCampana(campanaId) {
             let contenidoFinal = contenidoOriginal;
 
             // Reformular con IA si está activado
-            if (campana.auto_reformular === 1) {
-              console.log(`Reformulando noticia: "${item.title}"`);
+            const autoReformular = (campana.auto_reformular == 1 || campana.auto_reformular === true || campana.auto_reformular === '1');
+            if (autoReformular) {
+              console.log(`Reformulando noticia con IA: "${item.title}"`);
               const reformulado = await reformularNoticia(item.title, contenidoOriginal, apiKey);
               tituloFinal = reformulado.titulo;
               contenidoFinal = reformulado.contenido;
             }
 
             // Establecer estado
-            const estadoNoticia = campana.auto_publicar === 1 ? 'publicado' : 'borrador';
+            const autoPublicar = (campana.auto_publicar == 1 || campana.auto_publicar === true || campana.auto_publicar === '1');
+            const estadoNoticia = autoPublicar ? 'publicado' : 'borrador';
             const fechaNoticia = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
 
             // Insertar en base de datos
@@ -622,15 +650,16 @@ async function procesarCampana(campanaId) {
               });
             });
 
-            return true;
+            importados++;
+
+            // Pausa de 1 segundo si está activada la reformulación para respetar la tasa de la API de Gemini
+            if (autoReformular) {
+              await new Promise(res => setTimeout(res, 1000));
+            }
           } catch (itemErr) {
             console.error(`Error al procesar el artículo "${item.title}":`, itemErr.message);
-            return false;
           }
-        });
-
-        const resultados = await Promise.all(promesas);
-        importados = resultados.filter(Boolean).length;
+        }
 
         // Actualizar la última fecha de ejecución de la campaña
         const ahora = new Date().toISOString();
@@ -712,7 +741,7 @@ app.get('/api/cron', async (req, res) => {
     }
 
     const ahora = new Date();
-    const promesas = [];
+    const resultados = [];
 
     for (const campana of campanas) {
       let necesitaEjecutar = false;
@@ -733,21 +762,19 @@ app.get('/api/cron', async (req, res) => {
 
       if (necesitaEjecutar) {
         console.log(`Cron programó ejecutar campaña ${campana.id}`);
-        promesas.push(
-          procesarCampana(campana.id)
-            .then(resultado => {
-              console.log(`Campaña ${campana.id} completada por Cron.`);
-              return { id: campana.id, status: 'completada', resultado };
-            })
-            .catch(errCamp => {
-              console.error(`Error en campaña ${campana.id} por Cron:`, errCamp.message);
-              return { id: campana.id, status: 'error', error: errCamp.message };
-            })
-        );
+        try {
+          const resultado = await procesarCampana(campana.id);
+          console.log(`Campaña ${campana.id} completada por Cron.`);
+          resultados.push({ id: campana.id, status: 'completada', resultado });
+        } catch (errCamp) {
+          console.error(`Error en campaña ${campana.id} por Cron:`, errCamp.message);
+          resultados.push({ id: campana.id, status: 'error', error: errCamp.message });
+        }
+        // Esperar 2 segundos entre campañas para espaciar las solicitudes a Gemini
+        await new Promise(r => setTimeout(r, 2000));
       }
     }
 
-    const resultados = await Promise.all(promesas);
     res.json({
       mensaje: 'Procesamiento de Cron completado',
       fecha: ahora.toISOString(),
@@ -1269,6 +1296,109 @@ app.get('/api/publicidades', (req, res) => {
     const activeCloudRows = cloudRows.filter(r => r.activo === 1);
     res.json(activeCloudRows);
   });
+});
+
+// --- Generador de Feeds RSS por Categoría ---
+app.get('/categoria/:slug/feed', (req, res) => {
+  const slug = req.params.slug;
+  db.get('SELECT * FROM categorias WHERE slug = ?', [slug], (err, category) => {
+    if (err) return res.status(500).send('Error de base de datos (get category): ' + err.message);
+    if (!category) return res.status(404).send('Categoría no encontrada');
+
+    db.all('SELECT n.*, c.nombre as categoria_nombre FROM noticias n JOIN categorias c ON n.categoria_id = c.id WHERE c.slug = ? AND n.estado = \'publicado\' ORDER BY n.fecha DESC LIMIT 20', [slug], (err, rows) => {
+      if (err) return res.status(500).send('Error de base de datos (get noticias): ' + err.message);
+
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const host = req.headers.host;
+      const siteUrl = `${protocol}://${host}`;
+
+      const escapeXmlAttr = (str) => {
+        if (!str) return '';
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      };
+
+      const obtenerImagenOriginal = (url) => {
+        if (!url) return '';
+        if (url.includes('wsrv.nl')) {
+          try {
+            const parsed = new URL(url);
+            const original = parsed.searchParams.get('url');
+            if (original) return decodeURIComponent(original);
+          } catch (e) {
+            // fallback
+          }
+        }
+        return url;
+      };
+
+      const obtenerTipoMime = (url) => {
+        if (!url) return 'image/jpeg';
+        const ext = url.split('?')[0].split('.').pop().toLowerCase();
+        if (ext === 'png') return 'image/png';
+        if (ext === 'webp') return 'image/webp';
+        if (ext === 'gif') return 'image/gif';
+        return 'image/jpeg';
+      };
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	xmlns:media="http://search.yahoo.com/mrss/"
+>
+<channel>
+	<title><![CDATA[Pehuenia Online - ${category.nombre}]]></title>
+	<atom:link href="${escapeXmlAttr(siteUrl)}/categoria/${slug}/feed" rel="self" type="application/rss+xml" />
+	<link>${escapeXmlAttr(siteUrl)}</link>
+	<description><![CDATA[Noticias de la categoría ${category.nombre} en Pehuenia Online]]></description>
+	<lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+	<language>es-ES</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+`;
+
+      rows.forEach(n => {
+        const itemUrl = `${siteUrl}/#/noticia/${n.id}`;
+        const pubDate = new Date(n.fecha).toUTCString();
+        const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=600';
+        const originalImg = obtenerImagenOriginal(n.imagen_url || defaultImg);
+        const mimeType = obtenerTipoMime(originalImg);
+        const fullContentHtml = `<p><img src="${originalImg}" alt="${n.titulo}" /></p>${n.contenido}`;
+
+        xml += `	<item>
+		<title><![CDATA[${n.titulo}]]></title>
+		<link>${escapeXmlAttr(itemUrl)}</link>
+		<guid isPermaLink="false">${escapeXmlAttr(itemUrl)}</guid>
+		<pubDate>${pubDate}</pubDate>
+		<description><![CDATA[${fullContentHtml}]]></description>
+		<content:encoded><![CDATA[${fullContentHtml}]]></content:encoded>
+		<enclosure url="${escapeXmlAttr(originalImg)}" type="${mimeType}" length="0" />
+		<media:content url="${escapeXmlAttr(originalImg)}" medium="image" />
+	</item>
+`;
+      });
+
+      xml += `</channel>
+</rss>`;
+
+      res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
+      res.send(xml);
+    });
+  });
+});
+
+// Alias para los feeds
+app.get('/feed/:slug', (req, res) => {
+  res.redirect(`/categoria/${req.params.slug}/feed`);
 });
 
 // Obtener todas las publicidades (admin)
