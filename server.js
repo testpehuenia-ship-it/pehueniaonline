@@ -219,13 +219,21 @@ async function procesarCampana(campanaId) {
         if (esPaginaHtml) {
           try {
             console.log(`Raspando lista de artículos desde página HTML: ${campana.url_feed}`);
-            const responsePage = await fetch(campana.url_feed, {
+            let responsePage = await fetch(campana.url_feed, {
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
               },
               signal: AbortSignal.timeout(15000)
             });
-            if (!responsePage.ok) {
+
+            if (responsePage.status !== 200) {
+              console.warn(`Llamada inicial a feed HTML falló con estado ${responsePage.status}. Intentando sin cabeceras...`);
+              responsePage = await fetch(campana.url_feed, {
+                signal: AbortSignal.timeout(15000)
+              });
+            }
+
+            if (!responsePage.ok || responsePage.status !== 200) {
               throw new Error(`HTTP ${responsePage.status}`);
             }
             const htmlText = await responsePage.text();
@@ -321,8 +329,22 @@ async function procesarCampana(campanaId) {
             const esImagenValida = (url, type) => {
               if (!url) return false;
               if (type && (type.startsWith('audio/') || type.startsWith('video/'))) return false;
-              const ext = url.split('?')[0].split('.').pop().toLowerCase();
-              return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp'].includes(ext) || (type && type.startsWith('image/'));
+              
+              if (url.includes('espncdn.com/combiner/i') || url.includes('/combiner/i')) {
+                return true;
+              }
+              
+              const urlDecoded = decodeURIComponent(url);
+              const ext = urlDecoded.split('?')[0].split('.').pop().toLowerCase();
+              if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp'].includes(ext)) return true;
+              
+              for (const possibleExt of ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp']) {
+                if (urlDecoded.toLowerCase().includes('.' + possibleExt)) {
+                  return true;
+                }
+              }
+              
+              return !!(type && type.startsWith('image/'));
             };
 
             // Extraer imagen destacada (del feed o del primer <img> del contenido)
@@ -407,14 +429,21 @@ async function procesarCampana(campanaId) {
             if ((!imagenUrl || !tieneContenidoSuficiente) && item.link) {
               try {
                 console.log(`Buscando imagen/contenido en la web original: ${item.link}`);
-                const responsePage = await fetch(item.link, {
+                let responsePage = await fetch(item.link, {
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
                   },
                   signal: AbortSignal.timeout(10000)
                 });
                 
-                if (!responsePage.ok) {
+                if (responsePage.status !== 200) {
+                  console.warn(`Llamada inicial al artículo falló con estado ${responsePage.status}. Intentando sin cabeceras...`);
+                  responsePage = await fetch(item.link, {
+                    signal: AbortSignal.timeout(10000)
+                  });
+                }
+                
+                if (!responsePage.ok || responsePage.status !== 200) {
                   throw new Error(`HTTP ${responsePage.status}`);
                 }
                 
@@ -459,6 +488,7 @@ async function procesarCampana(campanaId) {
                   let bodyHtml = '';
                   const bodySelectors = [
                     '#cuerpo',
+                    '.article-body',
                     '.StoryTextContainer',
                     '.ms-article-content',
                     '.entry-content', 
@@ -491,12 +521,20 @@ async function procesarCampana(campanaId) {
                 console.warn(`Error al raspar directamente de ${item.link} (${scrapeErr.message}). Intentando vía Google Translate Proxy...`);
                 try {
                   const proxyUrl = `https://translate.google.com/translate?sl=es&tl=en&u=${encodeURIComponent(item.link)}`;
-                  const responsePage = await fetch(proxyUrl, {
+                  let responsePage = await fetch(proxyUrl, {
                     headers: {
                       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
                     },
                     signal: AbortSignal.timeout(15000)
                   });
+
+                  if (responsePage.status !== 200) {
+                    console.warn(`Llamada proxy falló con estado ${responsePage.status}. Intentando sin cabeceras...`);
+                    responsePage = await fetch(proxyUrl, {
+                      signal: AbortSignal.timeout(15000)
+                    });
+                  }
+
                   if (responsePage.ok) {
                     const htmlPage = await responsePage.text();
                     const $page = cheerio.load(htmlPage);
@@ -528,6 +566,7 @@ async function procesarCampana(campanaId) {
                       let bodyHtml = '';
                       const bodySelectors = [
                         '#cuerpo',
+                        '.article-body',
                         '.StoryTextContainer',
                         '.ms-article-content',
                         '.entry-content', 
