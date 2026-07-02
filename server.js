@@ -141,6 +141,49 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
   }
 }
 
+// Helper para truncar el HTML respetando los límites de palabras y caracteres sin romper etiquetas HTML
+function truncarHtml(html, maxPalabras, maxCaracteres) {
+  if (!html) return '';
+  const cheerio = require('cheerio');
+  const $ = cheerio.load(html);
+  
+  let palabrasTotales = 0;
+  let caracteresTotales = 0;
+  let limiteAlcanzado = false;
+  
+  $('body').children().each((i, el) => {
+    if (limiteAlcanzado) {
+      $(el).remove();
+      return;
+    }
+    
+    const text = $(el).text().trim();
+    if (!text) return;
+    
+    const palabras = text.split(/\s+/).filter(Boolean);
+    
+    if (palabrasTotales + palabras.length > maxPalabras || caracteresTotales + text.length > maxCaracteres) {
+      const palabrasDisponibles = maxPalabras - palabrasTotales;
+      const caracteresDisponibles = maxCaracteres - caracteresTotales;
+      
+      let nuevoTexto = '';
+      if (palabrasDisponibles > 0 && palabras.length > 0) {
+        nuevoTexto = palabras.slice(0, palabrasDisponibles).join(' ') + '...';
+      } else {
+        nuevoTexto = text.slice(0, Math.max(0, caracteresDisponibles)) + '...';
+      }
+      
+      $(el).text(nuevoTexto);
+      limiteAlcanzado = true;
+    } else {
+      palabrasTotales += palabras.length;
+      caracteresTotales += text.length;
+    }
+  });
+  
+  return $('body').html() || html;
+}
+
 // Helper para resolver URLs relativas a absolutas usando URL base
 function resolverUrlAbsoluta(urlRelativa, urlPagina) {
   if (!urlRelativa) return '';
@@ -700,6 +743,9 @@ async function procesarCampana(campanaId) {
             const estadoNoticia = autoPublicar ? 'publicado' : 'borrador';
             const fechaNoticia = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
 
+            // Enforce hard constraints on word and character counts (max 900 words, max 6000 characters)
+            contenidoFinal = truncarHtml(contenidoFinal, 900, 6000);
+
             // Insertar en base de datos
             await new Promise((res, rej) => {
               db.run(`
@@ -713,9 +759,9 @@ async function procesarCampana(campanaId) {
 
             importados++;
 
-            // Pausa de 1 segundo si está activada la reformulación para respetar la tasa de la API de Gemini
+            // Pausa de 4.5 segundos si está activada la reformulación para respetar la tasa de la API de Gemini (RPM de 15)
             if (autoReformular) {
-              await new Promise(res => setTimeout(res, 1000));
+              await new Promise(res => setTimeout(res, 4500));
             }
           } catch (itemErr) {
             console.error(`Error al procesar el artículo "${item.title}":`, itemErr.message);
