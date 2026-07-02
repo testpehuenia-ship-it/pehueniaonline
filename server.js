@@ -748,7 +748,7 @@ async function procesarCampana(campanaId) {
                 $('aside').remove(); // Quitar elementos flotantes de recomendación, widgets y tablas anexas
                 
                 // 2. Quitar anuncios, widgets comunes, bloques de compartir, etiquetas, firmas y metadatos de autor
-                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container, .ms-apb, .ms-ap, .ad-calc-data, [data-msnt-label="Publicidad"], [class*="ms-apb"], [class*="ms-ap"], msnt-survey-promo, msnt-comments-promo, section[data-widget="image"], section.relatedContent, section[data-widget="related-content"], msnt-driver-rating-widget-skeleton, msnt-driver-rating-widget, .outstream_partner, #ms-piano_article-prebanner, .related-container, .Newsletter, .sponsorHead, .inner-card-m, .related-content, #newsletter-clarin, .comments, #taboola-below-article-thumbnails, .article-meta, .content-reactions, .byline-wrap').remove();
+                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container, .ms-apb, .ms-ap, .ad-calc-data, [data-msnt-label="Publicidad"], [class*="ms-apb"], [class*="ms-ap"], msnt-survey-promo, msnt-comments-promo, section[data-widget="image"], section.relatedContent, section[data-widget="related-content"], msnt-driver-rating-widget-skeleton, msnt-driver-rating-widget, .outstream_partner, #ms-piano_article-prebanner, .related-container, .Newsletter, .sponsorHead, .inner-card-m, .related-content, #newsletter-clarin, .comments, #taboola-below-article-thumbnails, .article-meta, .content-reactions, .byline-wrap, .socialAuthorContainer, .authorBox, .AuthorName, .title-comments, #comments, figcaption').remove();
                 
                 // 3. Quitar imágenes internas del cuerpo (para dejar solo la imagen destacada principal)
                 $('img').remove();
@@ -759,13 +759,16 @@ async function procesarCampana(campanaId) {
                   $(el).replaceWith(text);
                 });
 
-                // 4b. Eliminar de forma genérica cualquier párrafo o bloque corto que contenga "Lee también" o "Temas"
-                $('p, div, strong, span, h2, h3, h4').each((i, el) => {
+                // 4b. Eliminar de forma genérica cualquier párrafo o bloque corto que contenga "Lee también", "Mirá también", "Temas" o comentarios
+                $('p, div, strong, span, h2, h3, h4, section').each((i, el) => {
                   const text = $(el).text().trim();
                   const textLower = text.toLowerCase();
                   if (
-                    (textLower.startsWith('lee también') || textLower.startsWith('lee tambien')) && 
-                    text.length < 200
+                    (textLower.startsWith('lee también') || textLower.startsWith('lee tambien') || 
+                     textLower.startsWith('mirá también') || textLower.startsWith('mira tambien') || 
+                     textLower.includes('mirá también') || textLower.includes('mira tambien') || 
+                     textLower.startsWith('mirá además') || textLower.startsWith('mira ademas')) && 
+                    text.length < 350
                   ) {
                     $(el).remove();
                   }
@@ -775,12 +778,21 @@ async function procesarCampana(campanaId) {
                   ) {
                     $(el).remove();
                   }
+                  if (
+                    (textLower.includes('comentar las notas de olé') || textLower === 'comentarios') && 
+                    text.length < 200
+                  ) {
+                    $(el).remove();
+                  }
                 });
                 
                 // Obtener el HTML limpio
                 let cleanedHtml = $.html();
                 
-                // 5. Remover leyendas de "Seguir leyendo", firmas, etc. en el texto
+                // 5. Remover firmas de autor, agencias de fotos y leyendas no deseadas en el texto
+                const regexCredito = /\s*\((Foto|EFE|AP|Reuters|Télam|Telam|Gentileza|Instagram|AFP|Getty|Facebook|Twitter|X|Web|Difusión|Archivo)[\s/:][^)]+\)/gi;
+                cleanedHtml = cleanedHtml.replace(regexCredito, '');
+                
                 cleanedHtml = cleanedHtml.replace(/<p[^>]*>La entrada.*?se publicó primero en.*?<\/p>/gi, '');
                 cleanedHtml = cleanedHtml.replace(/seguir leyendo/gi, '');
                 cleanedHtml = cleanedHtml.replace(/leer más/gi, '');
