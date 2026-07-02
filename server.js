@@ -46,6 +46,7 @@ async function reformularNoticia(tituloOriginal, contenidoOriginal, apiKey = '',
 2. Reformular el desarrollo de la noticia para que sea más clara, fluida y con una redacción periodística elegante. El contenido devuelto en el campo "contenido" debe estar estructurado en párrafos envueltos en etiquetas HTML <p>...</p> para mantener el formato y separación adecuados.
 3. EVITAR AI-isms (palabras cliché de IA como "pivotal", "robusto", "testamento a", "adentrarse", "apasionante", "comenzar un viaje", etc.). Usa un tono natural y humano.
 4. IMPORTANTISIMO: No inventes NINGÚN dato, cifra, nombre de persona, fecha, locación o hecho. Debes ceñirte única y estrictamente a la información que aparece en la noticia original. Prohibido inventar o alucinar datos.
+5. LONGITUD MÁXIMA: Si la noticia original es muy extensa, la reformulación redactada en el campo "contenido" NO debe superar las 900 palabras ni los 6.000 caracteres (incluyendo espacios) para lograr un balance óptimo entre profundidad de la información y agilidad de lectura.
 
 Devuelve la respuesta en formato JSON estructurado exactamente así:
 {
@@ -449,6 +450,16 @@ async function procesarCampana(campanaId) {
                 
                 const htmlPage = await responsePage.text();
                 const $page = cheerio.load(htmlPage);
+
+                // Intentar obtener el título completo si el original está incompleto o truncado
+                let scrapedTitle = $page('meta[property="og:title"]').attr('content') 
+                  || $page('meta[name="twitter:title"]').attr('content')
+                  || $page('title').text().replace(/\s*-\s*ESPN\s*$/i, '').trim();
+
+                if (scrapedTitle && (item.title.endsWith('...') || item.title.endsWith('…') || item.title.length < scrapedTitle.length - 5)) {
+                  console.log(`Título original incompleto o cortado ("${item.title}"). Reemplazado por el de la web: "${scrapedTitle}"`);
+                  item.title = scrapedTitle;
+                }
                 
                 // 1. Si no tenemos imagen destacada, intentamos extraerla
                 if (!imagenUrl) {
@@ -539,6 +550,16 @@ async function procesarCampana(campanaId) {
                     const htmlPage = await responsePage.text();
                     const $page = cheerio.load(htmlPage);
 
+                    // Intentar obtener el título completo si el original está incompleto o truncado
+                    let scrapedTitle = $page('meta[property="og:title"]').attr('content') 
+                      || $page('meta[name="twitter:title"]').attr('content')
+                      || $page('title').text().replace(/\s*-\s*ESPN\s*$/i, '').trim();
+
+                    if (scrapedTitle && (item.title.endsWith('...') || item.title.endsWith('…') || item.title.length < scrapedTitle.length - 5)) {
+                      console.log(`Título original incompleto o cortado ("${item.title}") vía proxy. Reemplazado por: "${scrapedTitle}"`);
+                      item.title = scrapedTitle;
+                    }
+
                     // 1. Si falta la imagen, buscarla vía proxy
                     if (!imagenUrl) {
                       let scrapedImg = $page('meta[property="og:image"]').attr('content') 
@@ -607,12 +628,13 @@ async function procesarCampana(campanaId) {
               try {
                 const $ = cheerio.load(contenidoOriginal);
                 
-                // 1. Quitar scripts e iframes
+                // 1. Quitar scripts, iframes y elementos secundarios no narrativos (asides)
                 $('script').remove();
                 $('iframe').remove();
+                $('aside').remove(); // Quitar elementos flotantes de recomendación, widgets y tablas anexas
                 
-                // 2. Quitar anuncios, widgets comunes, bloques de compartir, etiquetas y posts relacionados
-                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .wpcnt, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container, .ms-apb, .ms-ap, .ad-calc-data, [data-msnt-label="Publicidad"], [class*="ms-apb"], [class*="ms-ap"], msnt-survey-promo, msnt-comments-promo, section[data-widget="image"], section.relatedContent, section[data-widget="related-content"], msnt-driver-rating-widget-skeleton, msnt-driver-rating-widget, .outstream_partner, #ms-piano_article-prebanner, .related-container, .Newsletter, .sponsorHead, .inner-card-m, .related-content, #newsletter-clarin, .comments, #taboola-below-article-thumbnails').remove();
+                // 2. Quitar anuncios, widgets comunes, bloques de compartir, etiquetas, firmas y metadatos de autor
+                $('ins.adsbygoogle, .ads, .publicidad, .anuncio, .advertisement, .sharedaddy, .social-share, .jp-relatedposts, .newsfull__share, .newsfull__tags, .wp-block-lazyblock-leer-mas, .tags, .relacionadas, .related-posts, .tag-links, .tags-links, .entry-tags, .post-tags, .news-tags, .post-related, .related-posts-container, .ms-apb, .ms-ap, .ad-calc-data, [data-msnt-label="Publicidad"], [class*="ms-apb"], [class*="ms-ap"], msnt-survey-promo, msnt-comments-promo, section[data-widget="image"], section.relatedContent, section[data-widget="related-content"], msnt-driver-rating-widget-skeleton, msnt-driver-rating-widget, .outstream_partner, #ms-piano_article-prebanner, .related-container, .Newsletter, .sponsorHead, .inner-card-m, .related-content, #newsletter-clarin, .comments, #taboola-below-article-thumbnails, .article-meta, .content-reactions, .byline-wrap').remove();
                 
                 // 3. Quitar imágenes internas del cuerpo (para dejar solo la imagen destacada principal)
                 $('img').remove();
