@@ -40,7 +40,7 @@ const CACHE_TTL_MS = 60000; // 60 segundos
 // MOTOR DE REFORMULACIÓN (INTEGRACIÓN IA)
 // ==========================================
 
-async function reformularNoticia(tituloOriginal, contenidoOriginal, apiKey = '', zaiKey = '', intento = 1, forceZai = false) {
+async function reformularNoticia(tituloOriginal, contenidoOriginal, apiKeys = [], zaiKey = '', intento = 1, forceZai = false, keyIndex = 0) {
   const systemPrompt = `Eres un redactor de noticias profesional para el diario Pehuenia Online. Tu tarea es:
 1. Cambiar el título por uno más atractivo, limpio y moderno (estilo periodístico impecable, aplicando principios de curiosidad-contraste, evitando clickbait genérico).
 2. Reformular el desarrollo de la noticia para que sea más clara, fluida y con una redacción periodística elegante. El contenido devuelto en el campo "contenido" debe estar estructurado en párrafos envueltos en etiquetas HTML <p>...</p> para mantener el formato y separación adecuados.
@@ -54,7 +54,10 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
   "contenido": "Cuerpo de la noticia reformulado..."
 }`;
 
-  if (!apiKey && !zaiKey) {
+  const keysArray = Array.isArray(apiKeys) ? apiKeys : (apiKeys ? [apiKeys] : []);
+  const currentGeminiKey = keysArray[keyIndex] || '';
+
+  if (!currentGeminiKey && !zaiKey) {
     // Si no hay API Key configurada, realizamos una reformulación "mock" inteligente a nivel local
     console.log('API Keys no configuradas. Usando reformulador simulado local.');
     
@@ -91,8 +94,8 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
     };
   }
 
-  // 1. Intentar con Z.ai si forceZai es true o si no tenemos apiKey pero sí zaiKey
-  if (forceZai || (!apiKey && zaiKey)) {
+  // 1. Intentar con Z.ai si forceZai es true o si no tenemos Gemini keys pero sí zaiKey
+  if (forceZai || (!currentGeminiKey && zaiKey)) {
     try {
       console.log(`Intentando reformulación usando la API de Z.ai (modelo glm-5-turbo)...`);
       const response = await fetch('https://api.z.ai/api/paas/v4/chat/completions', {
@@ -116,7 +119,7 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
           const delay = intento * 5000; // 5s, 10s, 15s
           console.warn(`Límite de cuota Z.ai alcanzado (429). Reintentando intento ${intento}/3 en ${delay/1000}s...`);
           await new Promise(res => setTimeout(res, delay));
-          return reformularNoticia(tituloOriginal, contenidoOriginal, apiKey, zaiKey, intento + 1, true);
+          return reformularNoticia(tituloOriginal, contenidoOriginal, keysArray, zaiKey, intento + 1, true, keyIndex);
         }
       }
 
@@ -146,7 +149,7 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
 
   // 2. Intentar con Gemini por defecto
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${currentGeminiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -165,16 +168,22 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
 
     if (response.status === 429) {
       if (intento <= 3) {
-        const delay = intento * 5000; // 5s, 10s, 15s
-        console.warn(`Límite de cuota Gemini alcanzado (429) para "${tituloOriginal}". Reintentando intento ${intento}/3 en ${delay/1000}s...`);
+        const delay = intento * 6000; // 6s, 12s, 18s
+        console.warn(`Límite de cuota Gemini (clave #${keyIndex + 1}) alcanzado (429) para "${tituloOriginal}". Reintentando intento ${intento}/3 en ${delay/1000}s...`);
         await new Promise(res => setTimeout(res, delay));
-        return reformularNoticia(tituloOriginal, contenidoOriginal, apiKey, zaiKey, intento + 1, false);
+        return reformularNoticia(tituloOriginal, contenidoOriginal, keysArray, zaiKey, intento + 1, false, keyIndex);
       }
       
-      // Si agotamos los intentos de Gemini y tenemos zaiKey, rotamos a Z.ai
+      // Si agotamos los intentos de esta clave y hay más claves Gemini, rotamos a la siguiente
+      if (keyIndex + 1 < keysArray.length) {
+        console.warn(`Clave de Gemini #${keyIndex + 1} agotada por cuota. Rotando a la clave #${keyIndex + 2}...`);
+        return reformularNoticia(tituloOriginal, contenidoOriginal, keysArray, zaiKey, 1, false, keyIndex + 1);
+      }
+      
+      // Si agotamos todas las claves de Gemini y tenemos zaiKey, rotamos a Z.ai
       if (zaiKey) {
-        console.warn(`Gemini agotó sus reintentos por cuota (429). Rotando a la API de Z.ai...`);
-        return reformularNoticia(tituloOriginal, contenidoOriginal, apiKey, zaiKey, 1, true);
+        console.warn(`Todas las claves de Gemini agotadas. Rotando a la API de Z.ai...`);
+        return reformularNoticia(tituloOriginal, contenidoOriginal, keysArray, zaiKey, 1, true, 0);
       }
     }
 
@@ -190,12 +199,18 @@ Devuelve la respuesta en formato JSON estructurado exactamente así:
       contenido: result.contenido || contenidoOriginal
     };
   } catch (error) {
-    console.error('Error al reformular con Gemini:', error.message);
+    console.error(`Error al reformular con Gemini (clave #${keyIndex + 1}):`, error.message);
     
-    // Si Gemini da error y tenemos zaiKey, rotamos a Z.ai
+    // Rotar a la siguiente clave si hay disponibles
+    if (keyIndex + 1 < keysArray.length) {
+      console.warn(`Rotando a la siguiente clave de Gemini (#${keyIndex + 2})...`);
+      return reformularNoticia(tituloOriginal, contenidoOriginal, keysArray, zaiKey, 1, false, keyIndex + 1);
+    }
+    
+    // Si no quedan claves de Gemini y tenemos zaiKey, rotamos a Z.ai
     if (zaiKey) {
       console.warn(`Rotando a la API de Z.ai tras error de Gemini...`);
-      return reformularNoticia(tituloOriginal, contenidoOriginal, apiKey, zaiKey, 1, true);
+      return reformularNoticia(tituloOriginal, contenidoOriginal, keysArray, zaiKey, 1, true, 0);
     }
     
     return {
@@ -312,7 +327,7 @@ async function procesarCampana(campanaId) {
             db.get("SELECT valor FROM configuraciones WHERE clave = 'zai_api_key'", (err, row) => res(row));
           })
         ]);
-        const apiKey = apiKeyRow ? apiKeyRow.valor : '';
+        const apiKeys = apiKeyRow && apiKeyRow.valor ? apiKeyRow.valor.split(',').map(k => k.trim()).filter(Boolean) : [];
         const zaiKey = zaiKeyRow ? zaiKeyRow.valor : '';
 
         // Parsear el feed RSS (con fallback a proxy si falla por bloqueo de IP/firewall, o detección de página HTML para raspado directo)
@@ -816,7 +831,7 @@ async function procesarCampana(campanaId) {
             const autoReformular = (campana.auto_reformular == 1 || campana.auto_reformular === true || campana.auto_reformular === '1');
             if (autoReformular) {
               console.log(`Reformulando noticia con IA: "${item.title}"`);
-              const reformulado = await reformularNoticia(item.title, contenidoOriginal, apiKey, zaiKey);
+              const reformulado = await reformularNoticia(item.title, contenidoOriginal, apiKeys, zaiKey);
               tituloFinal = reformulado.titulo;
               contenidoFinal = reformulado.contenido;
             }
