@@ -443,6 +443,26 @@ async function procesarCampana(campanaId) {
 
         for (const item of itemsAProcesar) {
           try {
+            // Omitir noticias de necrológicas, sepelios, obituarios o último adiós
+            const tituloLower = (item.title || '').toLowerCase();
+            const linkLower = (item.link || '').toLowerCase();
+            if (
+              tituloLower.includes('necrologica') || 
+              tituloLower.includes('necrológica') || 
+              tituloLower.includes('sepelio') || 
+              tituloLower.includes('ultimo adios') || 
+              tituloLower.includes('último adiós') || 
+              tituloLower.includes('obituario') ||
+              linkLower.includes('necrologica') || 
+              linkLower.includes('necrológica') || 
+              linkLower.includes('sepelio') || 
+              linkLower.includes('ultimo-adios') || 
+              linkLower.includes('obituario')
+            ) {
+              console.log(`Omitiendo artículo de necrológicas/sepelio/último adiós detectado: "${item.title}"`);
+              continue;
+            }
+
             // Verificar si ya existe por URL original
             const existe = await new Promise((res) => {
               db.get('SELECT id FROM noticias WHERE url_original = ? OR titulo = ?', [item.link, item.title], (err, row) => res(row));
