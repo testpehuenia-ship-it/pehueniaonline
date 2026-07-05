@@ -453,11 +453,13 @@ async function procesarCampana(campanaId) {
               tituloLower.includes('ultimo adios') || 
               tituloLower.includes('último adiós') || 
               tituloLower.includes('obituario') ||
+              (tituloLower.includes('calf') && (tituloLower.includes('sepelio') || tituloLower.includes('funebre') || tituloLower.includes('fúnebre') || tituloLower.includes('fallecido'))) ||
               linkLower.includes('necrologica') || 
               linkLower.includes('necrológica') || 
               linkLower.includes('sepelio') || 
               linkLower.includes('ultimo-adios') || 
-              linkLower.includes('obituario')
+              linkLower.includes('obituario') ||
+              (linkLower.includes('calf') && (linkLower.includes('sepelio') || linkLower.includes('funebre') || linkLower.includes('fallecido')))
             ) {
               console.log(`Omitiendo artículo de necrológicas/sepelio/último adiós detectado: "${item.title}"`);
               continue;
