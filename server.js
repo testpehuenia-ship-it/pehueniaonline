@@ -465,6 +465,21 @@ async function procesarCampana(campanaId) {
               continue;
             }
 
+            // Omitir noticias de lotería, quiniela y sorteos
+            if (
+              tituloLower.includes('loteria') || 
+              tituloLower.includes('lotería') || 
+              tituloLower.includes('quiniela') || 
+              tituloLower.includes('sorteo de hoy') ||
+              linkLower.includes('loteria') || 
+              linkLower.includes('lotería') || 
+              linkLower.includes('quiniela') ||
+              linkLower.includes('sorteo-de-hoy')
+            ) {
+              console.log(`Omitiendo artículo de lotería/quiniela detectado: "${item.title}"`);
+              continue;
+            }
+
             // Verificar si ya existe por URL original
             const existe = await new Promise((res) => {
               db.get('SELECT id FROM noticias WHERE url_original = ? OR titulo = ?', [item.link, item.title], (err, row) => res(row));
