@@ -1339,15 +1339,22 @@ app.delete('/api/admin/campanas/:id', (req, res) => {
   });
 });
 
-// Ejecutar campaña manualmente
-app.post('/api/admin/campanas/:id/ejecutar', async (req, res) => {
+// Ejecutar campaña manualmente (Asíncrono para evitar Error 504 de Vercel)
+app.post('/api/admin/campanas/:id/ejecutar', (req, res) => {
   const id = req.params.id;
-  try {
-    const resultado = await procesarCampana(id);
-    res.json({ message: 'Campaña ejecutada manualmente con éxito', resultado });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  
+  // Ejecutamos en segundo plano porque Vercel Hobby tiene un límite de 10 segundos antes de dar 504.
+  // El proceso de scraping y llamadas a la IA (Gemini) frecuentemente excede los 10 segundos.
+  procesarCampana(id)
+    .then(resultado => {
+      console.log(`Campaña ${id} ejecutada manualmente en segundo plano:`, resultado);
+    })
+    .catch(error => {
+      console.error(`Error en ejecución manual de campaña ${id}:`, error.message);
+    });
+
+  // Respondemos inmediatamente al cliente para que la UI no se bloquee ni arroje 504.
+  res.json({ message: 'Campaña iniciada en segundo plano. La importación puede tardar varios segundos dependiendo de la IA.' });
 });
 
 // Endpoint de reformulación por IA manual (para revisar borradores o importar manualmente)
