@@ -258,8 +258,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       
       if (res.ok) {
-        const importados = data.resultado.importados !== undefined ? data.resultado.importados : 0;
-        alert(`Campaña completada. Se han importado ${importados} noticias nuevas.`);
+        if (data.resultado) {
+          const importados = data.resultado.importados !== undefined ? data.resultado.importados : 0;
+          alert(`Campaña completada. Se han importado ${importados} noticias nuevas.`);
+        } else {
+          alert(data.message || 'Campaña iniciada en segundo plano.');
+        }
         fetchCampanasList();
       } else {
         alert(`Error al ejecutar la campaña: ${data.error}`);
