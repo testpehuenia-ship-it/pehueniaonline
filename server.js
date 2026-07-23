@@ -1339,22 +1339,31 @@ app.delete('/api/admin/campanas/:id', (req, res) => {
   });
 });
 
-// Ejecutar campaña manualmente (Asíncrono para evitar Error 504 de Vercel)
-app.post('/api/admin/campanas/:id/ejecutar', (req, res) => {
+// Ejecutar campaña manualmente (Streaming para evitar Error 504 de Vercel)
+app.post('/api/admin/campanas/:id/ejecutar', async (req, res) => {
   const id = req.params.id;
   
-  // Ejecutamos en segundo plano porque Vercel Hobby tiene un límite de 10 segundos antes de dar 504.
-  // El proceso de scraping y llamadas a la IA (Gemini) frecuentemente excede los 10 segundos.
-  procesarCampana(id)
-    .then(resultado => {
-      console.log(`Campaña ${id} ejecutada manualmente en segundo plano:`, resultado);
-    })
-    .catch(error => {
-      console.error(`Error en ejecución manual de campaña ${id}:`, error.message);
-    });
+  // Vercel cierra la conexión si no hay respuesta en 10s (504).
+  // Escribimos los headers y enviamos espacios (JSON válido) para mantenerla viva.
+  res.writeHead(200, {
+    'Content-Type': 'application/json',
+    'Transfer-Encoding': 'chunked'
+  });
+  
+  const keepAlive = setInterval(() => {
+    res.write(' ');
+  }, 3000);
 
-  // Respondemos inmediatamente al cliente para que la UI no se bloquee ni arroje 504.
-  res.json({ message: 'Campaña iniciada en segundo plano. La importación puede tardar varios segundos dependiendo de la IA.' });
+  try {
+    const resultado = await procesarCampana(id);
+    clearInterval(keepAlive);
+    res.write(JSON.stringify({ message: 'Campaña ejecutada manualmente con éxito', resultado }));
+    res.end();
+  } catch (error) {
+    clearInterval(keepAlive);
+    res.write(JSON.stringify({ error: error.message }));
+    res.end();
+  }
 });
 
 // Endpoint de reformulación por IA manual (para revisar borradores o importar manualmente)
