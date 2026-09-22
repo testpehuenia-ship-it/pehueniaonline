@@ -15,11 +15,16 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Prevenir almacenamiento en caché de todas las APIs
+// Configuración de cabeceras de caché: APIs públicas con caché CDN/navegador, Admin sin caché
 app.use('/api', (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  if (req.path.startsWith('/admin')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  } else {
+    // Permitir a navegadores y CDN de Vercel almacenar en caché respuestas durante 60s/180s
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=180, stale-while-revalidate=300');
+  }
   next();
 });
 // Servir archivos estáticos del frontend

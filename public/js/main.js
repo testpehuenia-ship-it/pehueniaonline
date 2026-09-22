@@ -46,26 +46,53 @@ document.addEventListener('DOMContentLoaded', () => {
   let adsGeneradosGridCount = 0;
 
   // ==========================================
+  // OPTIMIZADOR DE IMÁGENES (CDN PROXY WSRV.NL)
+  // ==========================================
+
+  function getOptimizedImageUrl(url, width = 600, quality = 75) {
+    if (!url) return '';
+    // Archivos locales subidos o dominios con bloqueo de proxy
+    if (url.startsWith('/uploads/') || url.includes('vidanimal.org.ar')) {
+      return url;
+    }
+    // Si ya es una URL de wsrv.nl, reajustamos dimensiones y calidad
+    if (url.includes('wsrv.nl')) {
+      try {
+        const urlObj = new URL(url);
+        const originalUrl = urlObj.searchParams.get('url');
+        if (originalUrl) {
+          return `https://wsrv.nl/?url=${encodeURIComponent(originalUrl)}&w=${width}&output=webp&q=${quality}`;
+        }
+      } catch (e) {
+        return url;
+      }
+    }
+    // Si es URL externa http/https, redimensionar y comprimir en WebP
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=${width}&output=webp&q=${quality}`;
+    }
+    return url;
+  }
+
+  // ==========================================
   // INICIALIZACIÓN
   // ==========================================
 
-  async function init() {
+  function init() {
     setupDateTime();
     setupTheme();
     setupWeather();
     setupRates();
     setupEventListeners();
     
-    // Cargar publicidades y banners
-    await fetchPublicidades();
-    
-    // Cargar contenidos del backend
+    // Cargar publicidades y contenidos en paralelo (eliminando bloqueos secuenciales)
+    fetchPublicidades();
     fetchNoticiasTicker();
     fetchNoticiasHero();
     fetchNoticiasHomeCategorias();
     fetchReproductoresAudio();
 
-    // Cargar nuevos widgets de barra lateral
+    // Cargar widgets de barra lateral
     renderClimaSemanal();
     renderFixtureMundial();
     renderSidebarCategoriesDynamically();
@@ -243,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Ticker de Noticias de Última Hora
   async function fetchNoticiasTicker() {
     try {
-      const res = await fetch('/api/noticias?limite=8&_t=' + Date.now());
+      const res = await fetch('/api/noticias?limite=8');
       const noticias = await res.json();
       
       if (noticias.length === 0) {
@@ -267,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Grid del Hero
   async function fetchNoticiasHero() {
     try {
-      const res = await fetch('/api/noticias?limite=3&_t=' + Date.now());
+      const res = await fetch('/api/noticias?limite=3');
       const noticias = await res.json();
       
       if (noticias.length === 0) {
@@ -277,22 +304,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
       elements.heroGrid.innerHTML = '';
       
-      // Primera noticia (Grande)
+      // Primera noticia (Grande / LCP Hero Principal)
       const primary = noticias[0];
-      const primaryCard = createHeroItemMarkup(primary, 'large');
+      const primaryCard = createHeroItemMarkup(primary, 'large', true);
       elements.heroGrid.appendChild(primaryCard);
 
       // Segunda noticia (Mediana)
       if (noticias[1]) {
         const secondary = noticias[1];
-        const secondaryCard = createHeroItemMarkup(secondary, 'medium');
+        const secondaryCard = createHeroItemMarkup(secondary, 'medium', false);
         elements.heroGrid.appendChild(secondaryCard);
       }
 
-      // Tercera noticia (Pequeña - inyectamos un mockup si no hay para balancear el grid)
+      // Tercera noticia (Pequeña)
       if (noticias[2]) {
         const tertiary = noticias[2];
-        const tertiaryCard = createHeroItemMarkup(tertiary, 'small');
+        const tertiaryCard = createHeroItemMarkup(tertiary, 'small', false);
         elements.heroGrid.appendChild(tertiaryCard);
       }
     } catch (error) {
@@ -301,17 +328,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function createHeroItemMarkup(noticia, sizeClass) {
+  function createHeroItemMarkup(noticia, sizeClass, isPrimary = false) {
     const item = document.createElement('div');
     item.className = `hero-item ${sizeClass}`;
     
     const defaultImg = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=600';
-    const imagen = noticia.imagen_url || defaultImg;
+    const rawImg = noticia.imagen_url || defaultImg;
+    const targetWidth = isPrimary ? 800 : (sizeClass === 'medium' ? 500 : 400);
+    const imagen = getOptimizedImageUrl(rawImg, targetWidth, 75);
     
     const fechaFormateada = new Date(noticia.fecha).toLocaleDateString('es-AR');
+    const imgAttributes = isPrimary 
+      ? `fetchpriority="high" decoding="async"` 
+      : `loading="lazy" decoding="async"`;
 
     item.innerHTML = `
-      <img src="${imagen}" alt="${noticia.titulo}">
+      <img src="${imagen}" alt="${noticia.titulo}" ${imgAttributes}>
       <div class="hero-overlay">
         <span class="hero-category">${noticia.categoria_name}</span>
         <h3 class="hero-title">${noticia.titulo}</h3>
@@ -323,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return item;
   }
 
-  // Cargar categorías y renderizarlas dinámicamente según su configuración en el inicio
+  // Cargar categorías y renderizarlas en paralelo sin bloqueos secuenciales
   async function fetchNoticiasHomeCategorias() {
     const container = document.getElementById('dynamic-home-categories');
     if (!container) return;
@@ -331,26 +363,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       adsGeneradosGridCount = 0;
-      // 1. Obtener todas las categorías
-      const catRes = await fetch('/api/categorias?_t=' + Date.now());
+      // 1. Obtener todas las categorías (aprovechando caché)
+      const catRes = await fetch('/api/categorias');
       const categorias = await catRes.json();
 
       // Filtrar categorías activas para la columna principal (izquierda) y ordenar
       const categoriasHome = categorias.filter(c => c.slug !== 'quienes-somos' && c.slug !== 'contacto' && c.posicion_home !== 'derecha');
       categoriasHome.sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.id - b.id);
 
+      // 2. Cargar noticias de todas las categorías en paralelo (sin bucle secuencial bloqueante)
+      const newsPromises = categoriasHome.map(async (cat) => {
+        const limite = cat.limite_home || 3;
+        try {
+          const resNews = await fetch(`/api/noticias?categoria=${cat.slug}&limite=${limite}`);
+          const noticias = await resNews.json();
+          return { cat, noticias };
+        } catch (e) {
+          console.error(`Error al cargar noticias de ${cat.slug}:`, e);
+          return { cat, noticias: [] };
+        }
+      });
+
+      const categoryResults = await Promise.all(newsPromises);
 
       container.innerHTML = '';
       let indexC = 0;
       let filaOcupada = 0; // Acumulador de columnas ocupadas (0 a 3)
 
-      // 2. Para cada categoría, cargar noticias
-      for (const cat of categoriasHome) {
-        const limite = cat.limite_home || 3;
-        const resNews = await fetch(`/api/noticias?categoria=${cat.slug}&limite=${limite}&_t=` + Date.now());
-        const noticias = await resNews.json();
-
-        if (noticias.length === 0) continue; // Omitir categoría si no tiene noticias
+      // 3. Renderizar resultados procesados
+      for (const { cat, noticias } of categoryResults) {
+        if (!noticias || noticias.length === 0) continue; // Omitir categoría si no tiene noticias
 
         // Determinar span de columna según el diseño
         const diseno = cat.diseno_home || 'grid';
@@ -498,13 +540,14 @@ document.addEventListener('DOMContentLoaded', () => {
       card.className = 'post-card';
       
       const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=400';
-      const imagen = noticia.imagen_url || defaultImg;
+      const rawImg = noticia.imagen_url || defaultImg;
+      const imagen = getOptimizedImageUrl(rawImg, 500, 75);
       const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
       const copete = noticia.copete || noticia.contenido.replace(/<[^>]*>/g, '').slice(0, 100) + '...';
 
       card.innerHTML = `
         <div class="post-card-thumb">
-          <img src="${imagen}" alt="${noticia.titulo}">
+          <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
         </div>
         <div class="post-card-body">
           <span class="post-card-category">${noticia.categoria_name}</span>
@@ -533,12 +576,13 @@ document.addEventListener('DOMContentLoaded', () => {
       item.className = 'post-list-item';
       
       const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=150';
-      const imagen = noticia.imagen_url || defaultImg;
+      const rawImg = noticia.imagen_url || defaultImg;
+      const imagen = getOptimizedImageUrl(rawImg, 200, 70);
       const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
 
       item.innerHTML = `
         <div class="post-list-thumb">
-          <img src="${imagen}" alt="${noticia.titulo}">
+          <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
         </div>
         <div class="post-list-content">
           <h4 class="post-list-title">${noticia.titulo}</h4>
@@ -556,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchReproductoresAudio() {
     try {
-      const res = await fetch('/api/reproductores?_t=' + Date.now());
+      const res = await fetch('/api/reproductores');
       state.reproductores = await res.json();
       renderReproductores();
     } catch (error) {
@@ -647,15 +691,15 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.gridCategoryPosts.innerHTML = '<div class="shimmer-placeholder" style="height:250px; grid-column:1/4"></div>';
     
     try {
-      // Buscar información de la categoría para poner el título correcto
-      const catRes = await fetch('/api/categorias?_t=' + Date.now());
-      const categorias = await catRes.json();
+      // Buscar información de la categoría y noticias en paralelo
+      const [catRes, res] = await Promise.all([
+        fetch('/api/categorias'),
+        fetch(`/api/noticias?categoria=${categorySlug}&limite=20`)
+      ]);
+      const [categorias, noticias] = await Promise.all([catRes.json(), res.json()]);
+
       const catObj = categorias.find(c => c.slug === categorySlug);
       elements.categoryPageTitle.textContent = catObj ? catObj.nombre : categorySlug.toUpperCase();
-
-      // Buscar noticias de esta categoría
-      const res = await fetch(`/api/noticias?categoria=${categorySlug}&limite=20&_t=` + Date.now());
-      const noticias = await res.json();
       
       renderCategoryGrid(noticias);
     } catch (error) {
@@ -677,13 +721,14 @@ document.addEventListener('DOMContentLoaded', () => {
       card.className = 'post-card-horizontal';
       
       const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=400';
-      const imagen = noticia.imagen_url || defaultImg;
+      const rawImg = noticia.imagen_url || defaultImg;
+      const imagen = getOptimizedImageUrl(rawImg, 500, 75);
       const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
       const copete = noticia.copete || noticia.contenido.replace(/<[^>]*>/g, '').slice(0, 150) + '...';
 
       card.innerHTML = `
         <div class="post-card-horizontal-thumb">
-          <img src="${imagen}" alt="${noticia.titulo}">
+          <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
         </div>
         <div class="post-card-horizontal-body">
           <div>
@@ -708,7 +753,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.articleDetailContent.innerHTML = '<div class="shimmer-placeholder" style="height:400px"></div>';
     
     try {
-      const res = await fetch(`/api/noticias/${noticiaId}?_t=` + Date.now());
+      const res = await fetch(`/api/noticias/${noticiaId}`);
       if (!res.ok) throw new Error();
       const noticia = await res.json();
       
@@ -721,7 +766,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=800';
-      const imagen = noticia.imagen_url || defaultImg;
+      const rawImg = noticia.imagen_url || defaultImg;
+      const imagen = getOptimizedImageUrl(rawImg, 900, 80);
       const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       
       let badgeHtml = noticia.url_original ? `<span class="editorial-tag"><a href="${noticia.url_original}" target="_blank"><i class="fa-solid fa-link"></i> Fuente Original</a></span>` : '';
@@ -748,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         
         <div class="article-main-image">
-          <img src="${imagen}" alt="${noticia.titulo}">
+          <img src="${imagen}" alt="${noticia.titulo}" fetchpriority="high" decoding="async">
         </div>
         
         <div class="article-body">
@@ -840,7 +886,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.feedsListContainer.innerHTML = '<div class="shimmer-placeholder" style="height:150px; width:100%"></div>';
 
     try {
-      const catRes = await fetch('/api/categorias?_t=' + Date.now());
+      const catRes = await fetch('/api/categorias');
       const categorias = await catRes.json();
 
       if (!categorias || categorias.length === 0) {
@@ -911,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.gridCategoryPosts.innerHTML = '<div class="shimmer-placeholder" style="height:250px; grid-column:1/4"></div>';
 
     try {
-      const res = await fetch('/api/noticias?limite=50&_t=' + Date.now());
+      const res = await fetch('/api/noticias?limite=50');
       const noticias = await res.json();
       const filtradas = noticias.filter(n => 
         n.titulo.toLowerCase().includes(query.toLowerCase()) || 
@@ -971,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchPublicidades() {
     try {
-      const res = await fetch('/api/publicidades?_t=' + Date.now());
+      const res = await fetch('/api/publicidades');
       publicidadesCargadas = await res.json();
       
       desplegarPublicidadesEstaticas();
@@ -992,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const mediaHtml = ad.formato === 'video' 
       ? `<video src="${ad.url_archivo}" autoplay loop muted playsinline></video>`
-      : `<img src="${ad.url_archivo}" alt="${ad.nombre}">`;
+      : `<img src="${ad.url_archivo}" alt="${ad.nombre}" loading="lazy" decoding="async">`;
 
     return `
       <a href="${ad.url_destino}" target="_blank" class="ad-link">
@@ -1051,7 +1097,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (overlay && body && closeBtn) {
       const mediaHtml = popupAd.formato === 'video'
         ? `<video src="${popupAd.url_archivo}" autoplay loop muted playsinline></video>`
-        : `<img src="${popupAd.url_archivo}" alt="${popupAd.nombre}">`;
+        : `<img src="${popupAd.url_archivo}" alt="${popupAd.nombre}" loading="lazy" decoding="async">`;
 
       body.innerHTML = `
         <a href="${popupAd.url_destino}" target="_blank">
@@ -1084,13 +1130,14 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'post-card';
     
     const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=400';
-    const imagen = noticia.imagen_url || defaultImg;
+    const rawImg = noticia.imagen_url || defaultImg;
+    const imagen = getOptimizedImageUrl(rawImg, 500, 75);
     const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
     const copete = noticia.copete || noticia.contenido.replace(/<[^>]*>/g, '').slice(0, 100) + '...';
 
     card.innerHTML = `
       <div class="post-card-thumb">
-        <img src="${imagen}" alt="${noticia.titulo}">
+        <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
       </div>
       <div class="post-card-body">
         <span class="post-card-category" style="color: var(--color-orange);">${noticia.categoria_nombre || noticia.categoria_name}</span>
@@ -1111,12 +1158,13 @@ document.addEventListener('DOMContentLoaded', () => {
     item.className = 'post-list-item';
     
     const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=150';
-    const imagen = noticia.imagen_url || defaultImg;
+    const rawImg = noticia.imagen_url || defaultImg;
+    const imagen = getOptimizedImageUrl(rawImg, 200, 70);
     const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
 
     item.innerHTML = `
       <div class="post-list-thumb">
-        <img src="${imagen}" alt="${noticia.titulo}">
+        <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
       </div>
       <div class="post-list-content">
         <h4 class="post-list-title">${noticia.titulo}</h4>
@@ -1132,11 +1180,12 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'post-card-large-image';
     
     const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=600';
-    const imagen = noticia.imagen_url || defaultImg;
+    const rawImg = noticia.imagen_url || defaultImg;
+    const imagen = getOptimizedImageUrl(rawImg, 600, 75);
     const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
 
     card.innerHTML = `
-      <img src="${imagen}" alt="${noticia.titulo}">
+      <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
       <div class="post-card-large-image-body">
         <span class="post-card-category" style="color: var(--color-orange);">${noticia.categoria_nombre || noticia.categoria_name}</span>
         <h3 class="post-card-large-image-title">${noticia.titulo}</h3>
@@ -1154,11 +1203,12 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'post-card-title-overlay';
     
     const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=600';
-    const imagen = noticia.imagen_url || defaultImg;
+    const rawImg = noticia.imagen_url || defaultImg;
+    const imagen = getOptimizedImageUrl(rawImg, 600, 75);
     const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
 
     card.innerHTML = `
-      <img src="${imagen}" alt="${noticia.titulo}">
+      <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
       <div class="post-card-title-overlay-content">
         <span class="post-card-title-overlay-cat">${noticia.categoria_nombre || noticia.categoria_name}</span>
         <h3 class="post-card-title-overlay-title">${noticia.titulo}</h3>
@@ -1176,12 +1226,13 @@ document.addEventListener('DOMContentLoaded', () => {
     card.className = 'post-card-carousel-infinite';
     
     const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=400';
-    const imagen = noticia.imagen_url || defaultImg;
+    const rawImg = noticia.imagen_url || defaultImg;
+    const imagen = getOptimizedImageUrl(rawImg, 300, 70);
     const fecha = new Date(noticia.fecha).toLocaleDateString('es-AR');
 
     card.innerHTML = `
       <div class="post-card-carousel-infinite-thumb">
-        <img src="${imagen}" alt="${noticia.titulo}">
+        <img src="${imagen}" alt="${noticia.titulo}" loading="lazy" decoding="async">
       </div>
       <div class="post-card-carousel-infinite-body">
         <div>
@@ -1394,14 +1445,14 @@ document.addEventListener('DOMContentLoaded', () => {
       row.innerHTML = `
         <div class="fixture-team team-a">
           <span class="fixture-team-name">${p.equipoA}</span>
-          <img src="https://flagcdn.com/w20/${p.flagA}.png" alt="${p.equipoA}" class="fixture-flag">
+          <img src="https://flagcdn.com/w20/${p.flagA}.png" alt="${p.equipoA}" class="fixture-flag" loading="lazy" decoding="async">
         </div>
         <div class="fixture-info">
           <span class="fixture-score" style="${isLive ? 'color: var(--color-orange);' : ''}">${scoreText}</span>
           <span class="fixture-date" style="${isLive ? 'color: var(--color-orange); font-weight:700;' : ''}">${isLive ? 'EN VIVO' : p.fecha}</span>
         </div>
         <div class="fixture-team team-b">
-          <img src="https://flagcdn.com/w20/${p.flagB}.png" alt="${p.equipoB}" class="fixture-flag">
+          <img src="https://flagcdn.com/w20/${p.flagB}.png" alt="${p.equipoB}" class="fixture-flag" loading="lazy" decoding="async">
           <span class="fixture-team-name">${p.equipoB}</span>
         </div>
       `;
@@ -1409,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Widget de Categorías Dinámicas en Barra Lateral
+  // Widget de Categorías Dinámicas en Barra Lateral (Consultas en Paralelo)
   async function renderSidebarCategoriesDynamically() {
     const placeholders = ['sidebar-policiales-category', 'sidebar-curiosidades-category', 'sidebar-compact-category'];
     placeholders.forEach(id => {
@@ -1424,11 +1475,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[id^="sidebar-dynamic-cat-"]').forEach(el => el.remove());
 
     try {
-      const catRes = await fetch('/api/categorias?_t=' + Date.now());
+      const catRes = await fetch('/api/categorias');
       const categorias = await catRes.json();
 
       const rightCats = categorias.filter(c => c.posicion_home === 'derecha');
       rightCats.sort((a, b) => (a.orden || 0) - (b.orden || 0) || a.id - b.id);
+
+      if (rightCats.length === 0) return;
+
+      // Cargar noticias de todas las categorías laterales en paralelo
+      const sidebarNewsPromises = rightCats.map(async (cat) => {
+        const limit = cat.limite_home || 3;
+        try {
+          const res = await fetch(`/api/noticias?categoria=${cat.slug}&limite=${limit}`);
+          const noticias = await res.json();
+          return { cat, noticias };
+        } catch (e) {
+          return { cat, noticias: [] };
+        }
+      });
+
+      const sidebarResults = await Promise.all(sidebarNewsPromises);
 
       const iconMap = {
         'policiales': 'fa-solid fa-building-shield',
@@ -1446,8 +1513,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let lastContainer = document.getElementById(placeholders[placeholders.length - 1]);
 
-      for (let i = 0; i < rightCats.length; i++) {
-        const cat = rightCats[i];
+      for (let i = 0; i < sidebarResults.length; i++) {
+        const { cat, noticias } = sidebarResults[i];
+        if (!noticias || noticias.length === 0) continue;
+
         let container;
         if (i < placeholders.length) {
           container = document.getElementById(placeholders[i]);
@@ -1463,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (container) {
           const iconClass = iconMap[cat.slug] || 'fa-solid fa-newspaper';
-          await populateSidebarContainer(cat, container, iconClass);
+          populateSidebarContainerWithData(cat, container, iconClass, noticias);
         }
       }
     } catch (err) {
@@ -1471,67 +1540,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function populateSidebarContainer(category, container, iconClass) {
-    try {
-      const limit = category.limite_home || 3;
-      const res = await fetch(`/api/noticias?categoria=${category.slug}&limite=${limit}&_t=` + Date.now());
-      const noticias = await res.json();
-      
-      if (noticias.length === 0) {
-        container.style.display = 'none';
-        return;
-      }
-      
-      container.style.display = 'block';
-      
-      const diseno = category.diseno_home || 'list';
-      let listClass = 'compact-posts-list';
-      if (diseno === 'large-image') {
-        listClass = 'posts-large-image-layout';
-      } else if (diseno === 'title-overlay') {
-        listClass = 'posts-title-overlay-layout';
-      }
-
-      container.innerHTML = `
-        <h3 class="widget-title"><i class="${iconClass || 'fa-solid fa-list-ul'}"></i> ${category.nombre}</h3>
-        <div class="${listClass}"></div>
-      `;
-      
-      const listContainer = container.querySelector(`.${listClass}`);
-      const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=150';
-      
-      noticias.forEach(n => {
-        let item;
-        if (diseno === 'large-image') {
-          item = createPostLargeImageMarkup(n);
-        } else if (diseno === 'title-overlay') {
-          item = createPostTitleOverlayMarkup(n);
-        } else {
-          item = document.createElement('div');
-          item.className = 'compact-post-item';
-          
-          const imagen = n.imagen_url || defaultImg;
-          const fecha = new Date(n.fecha).toLocaleDateString('es-AR');
-          
-          item.innerHTML = `
-            <div class="compact-post-thumb">
-              <img src="${imagen}" alt="${n.titulo}">
-            </div>
-            <div class="compact-post-content">
-              <h4 class="compact-post-title">${n.titulo}</h4>
-              <span class="compact-post-meta">${fecha}</span>
-            </div>
-          `;
-          item.addEventListener('click', () => {
-            window.location.hash = '#/noticia/' + n.id;
-          });
-        }
-        listContainer.appendChild(item);
-      });
-    } catch (err) {
-      console.error(`Error populating sidebar category ${category.slug}:`, err);
+  function populateSidebarContainerWithData(category, container, iconClass, noticias) {
+    if (!noticias || noticias.length === 0) {
       container.style.display = 'none';
+      return;
     }
+    
+    container.style.display = 'block';
+    
+    const diseno = category.diseno_home || 'list';
+    let listClass = 'compact-posts-list';
+    if (diseno === 'large-image') {
+      listClass = 'posts-large-image-layout';
+    } else if (diseno === 'title-overlay') {
+      listClass = 'posts-title-overlay-layout';
+    }
+
+    container.innerHTML = `
+      <h3 class="widget-title"><i class="${iconClass || 'fa-solid fa-list-ul'}"></i> ${category.nombre}</h3>
+      <div class="${listClass}"></div>
+    `;
+    
+    const listContainer = container.querySelector(`.${listClass}`);
+    const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=150';
+    
+    noticias.forEach(n => {
+      let item;
+      if (diseno === 'large-image') {
+        item = createPostLargeImageMarkup(n);
+      } else if (diseno === 'title-overlay') {
+        item = createPostTitleOverlayMarkup(n);
+      } else {
+        item = document.createElement('div');
+        item.className = 'compact-post-item';
+        
+        const rawImg = n.imagen_url || defaultImg;
+        const imagen = getOptimizedImageUrl(rawImg, 200, 70);
+        const fecha = new Date(n.fecha).toLocaleDateString('es-AR');
+        
+        item.innerHTML = `
+          <div class="compact-post-thumb">
+            <img src="${imagen}" alt="${n.titulo}" loading="lazy" decoding="async">
+          </div>
+          <div class="compact-post-content">
+            <h4 class="compact-post-title">${n.titulo}</h4>
+            <span class="compact-post-meta">${fecha}</span>
+          </div>
+        `;
+        item.addEventListener('click', () => {
+          window.location.hash = '#/noticia/' + n.id;
+        });
+      }
+      listContainer.appendChild(item);
+    });
   }
 
   // Ejecutar al cargar la app
