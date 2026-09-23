@@ -1335,7 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function desplegarPublicidadesEstaticas() {
-    // 1. Banner Superior
+    // 1. Banner Superior de Cabecera
     const topAds = obtenerTodasPublicidadesParaPosicion(['P-Superior', 'P-Superior-Fino', 'banner_1200x200', 'banner_1200x100']);
     const topContainer = document.getElementById('ad-top-banner');
     if (topContainer) {
@@ -1343,19 +1343,55 @@ document.addEventListener('DOMContentLoaded', () => {
       renderizarBloquePublicidad(topContainer, topAds, isLarge ? 'ad-banner-1200x200' : 'ad-banner-1200x100');
     }
 
-    // 2. Banners Laterales (Posiciones P3 y P4)
-    const adsP3 = obtenerTodasPublicidadesParaPosicion(['P3', 'banner_300x300']);
-    const sidebarContainer1 = document.getElementById('ad-sidebar-banner-1');
-    if (sidebarContainer1) {
-      renderizarBloquePublicidad(sidebarContainer1, adsP3, 'ad-banner-300x300');
+    // 2. Banners del Sector Derecho / Lateral de 1 Columna:
+
+    // 2.1. Debajo de Radios en Vivo (P3)
+    const adsRadios = obtenerTodasPublicidadesParaPosicion(['lateral_radios', 'P-Radio', 'P3', 'banner_300x300']);
+    const lateralRadiosEl = document.getElementById('ad-sidebar-radios');
+    if (lateralRadiosEl) {
+      renderizarBloquePublicidad(lateralRadiosEl, adsRadios, 'ad-banner-300x300');
     }
 
-    const adsP4 = obtenerTodasPublicidadesParaPosicion(['P4']);
-    const sidebarContainer2 = document.getElementById('ad-sidebar-banner-2');
-    if (sidebarContainer2) {
-      // Si no hay anuncio configurado específicamente para P4, pero hay varios en P3 o 300x300, podemos rotar los restantes
-      const itemsP4 = adsP4.length > 0 ? adsP4 : adsP3.slice(1);
-      renderizarBloquePublicidad(sidebarContainer2, itemsP4, 'ad-banner-300x300');
+    // 2.2. Debajo de Policiales
+    const adsPoliciales = obtenerTodasPublicidadesParaPosicion(['lateral_policiales', 'P-Lateral-Policiales']);
+    const lateralPolicialesEl = document.getElementById('ad-sidebar-policiales');
+    if (lateralPolicialesEl) {
+      renderizarBloquePublicidad(lateralPolicialesEl, adsPoliciales, 'ad-banner-300x300');
+    }
+
+    // 2.3. Debajo de Clima Semanal
+    const adsClima = obtenerTodasPublicidadesParaPosicion(['lateral_clima', 'P-Lateral-Clima']);
+    const lateralClimaEl = document.getElementById('ad-sidebar-clima');
+    if (lateralClimaEl) {
+      renderizarBloquePublicidad(lateralClimaEl, adsClima, 'ad-banner-300x300');
+    }
+
+    // 2.4. Debajo de Mercados / Cotizaciones
+    const adsMercados = obtenerTodasPublicidadesParaPosicion(['lateral_mercados', 'P-Lateral-Mercados']);
+    const lateralMercadosEl = document.getElementById('ad-sidebar-mercados');
+    if (lateralMercadosEl) {
+      renderizarBloquePublicidad(lateralMercadosEl, adsMercados, 'ad-banner-300x300');
+    }
+
+    // 2.5. Debajo de Entretenimiento y Curiosidades
+    const adsCuriosidades = obtenerTodasPublicidadesParaPosicion(['lateral_curiosidades', 'P-Lateral-Curiosidades']);
+    const lateralCuriosidadesEl = document.getElementById('ad-sidebar-curiosidades');
+    if (lateralCuriosidadesEl) {
+      renderizarBloquePublicidad(lateralCuriosidadesEl, adsCuriosidades, 'ad-banner-300x300');
+    }
+
+    // 2.6. Debajo de Mascotas (P4)
+    const adsMascotas = obtenerTodasPublicidadesParaPosicion(['lateral_mascotas', 'P-Lateral-Mascotas', 'P4']);
+    const lateralMascotasEl = document.getElementById('ad-sidebar-mascotas');
+    if (lateralMascotasEl) {
+      renderizarBloquePublicidad(lateralMascotasEl, adsMascotas, 'ad-banner-300x300');
+    }
+
+    // 2.7. Debajo de Editorial / Opinión
+    const adsEditorial = obtenerTodasPublicidadesParaPosicion(['lateral_editorial', 'P-Lateral-Editorial', 'P-Editorial']);
+    const lateralEditorialEl = document.getElementById('ad-sidebar-editorial');
+    if (lateralEditorialEl) {
+      renderizarBloquePublicidad(lateralEditorialEl, adsEditorial, 'ad-banner-300x300');
     }
   }
 

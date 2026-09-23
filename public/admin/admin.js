@@ -732,8 +732,13 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (pub.tipo === 'P-Superior-Fino') tipoLabel = 'P-Superior Fino (Banner Superior 1200x100)';
         else if (pub.tipo === 'P-Middle') tipoLabel = 'P-Middle (Banner Intermedio 700x200)';
         else if (pub.tipo === 'P-Middle-Fino') tipoLabel = 'P-Middle Fino (Banner Intermedio 700x100)';
-        else if (pub.tipo === 'P3') tipoLabel = 'P3 (Barra Lateral Superior 300x300)';
-        else if (pub.tipo === 'P4') tipoLabel = 'P4 (Barra Lateral Inferior 300x300)';
+        else if (pub.tipo === 'P3' || pub.tipo === 'lateral_radios') tipoLabel = 'Lateral: Debajo de Radios en Vivo';
+        else if (pub.tipo === 'lateral_policiales') tipoLabel = 'Lateral: Debajo de Policiales';
+        else if (pub.tipo === 'lateral_clima') tipoLabel = 'Lateral: Debajo de Clima Semanal';
+        else if (pub.tipo === 'lateral_mercados') tipoLabel = 'Lateral: Debajo de Mercados';
+        else if (pub.tipo === 'lateral_curiosidades') tipoLabel = 'Lateral: Debajo de Curiosidades';
+        else if (pub.tipo === 'P4' || pub.tipo === 'lateral_mascotas') tipoLabel = 'Lateral: Debajo de Mascotas';
+        else if (pub.tipo === 'lateral_editorial') tipoLabel = 'Lateral: Debajo de Editorial';
         else if (pub.tipo === 'popup') tipoLabel = 'Popup de Bienvenida';
         else if (pub.tipo.startsWith('banner_cat_')) {
           const catSlug = pub.tipo.replace('banner_cat_', '');
@@ -742,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const num = pub.tipo.replace('P-Cat-', '');
           tipoLabel = `Debajo de Categoría #${num}`;
         } else {
-          tipoLabel = pub.tipo.replace('banner_', 'Banner ').replace('popup', 'Popup Flotante');
+          tipoLabel = pub.tipo.replace('banner_', 'Banner ').replace('popup', 'Popup Flotante').replace('lateral_', 'Lateral: ');
         }
 
         const urls = parseUrlsPublicidad(pub.url_archivo);
