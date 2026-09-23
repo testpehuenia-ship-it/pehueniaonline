@@ -1174,7 +1174,7 @@ app.get('/api/categorias', (req, res) => {
 // Obtener últimas noticias (publicadas)
 app.get('/api/noticias', (req, res) => {
   const { categoria, limite = 10, offset = 0 } = req.query;
-  let query = "SELECT n.*, c.nombre as categoria_nombre, c.nombre as categoria_name FROM noticias n JOIN categorias c ON n.categoria_id = c.id WHERE n.estado = 'publicado'";
+  let query = "SELECT n.*, c.nombre as categoria_nombre, c.nombre as categoria_name, c.slug as categoria_slug FROM noticias n JOIN categorias c ON n.categoria_id = c.id WHERE n.estado = 'publicado'";
   const params = [];
 
   if (categoria) {
@@ -1203,7 +1203,7 @@ app.get('/api/diag', (req, res) => {
 // Obtener una noticia por ID y registrar visita (lectura)
 app.get('/api/noticias/:id', (req, res) => {
   const id = req.params.id;
-  db.get('SELECT n.*, c.nombre as categoria_nombre, c.nombre as categoria_name FROM noticias n JOIN categorias c ON n.categoria_id = c.id WHERE n.id = ?', [id], (err, row) => {
+  db.get('SELECT n.*, c.nombre as categoria_nombre, c.nombre as categoria_name, c.slug as categoria_slug FROM noticias n JOIN categorias c ON n.categoria_id = c.id WHERE n.id = ?', [id], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!row) return res.status(404).json({ error: 'Noticia no encontrada' });
 

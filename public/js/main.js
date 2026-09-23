@@ -800,6 +800,25 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="article-body">
           ${noticia.contenido}
         </div>
+
+        <!-- Sección: Te puede interesar (2 de la categoría + 1 relacionada por tema) -->
+        <section class="article-related-section">
+          <div class="article-related-header">
+            <h3>Te puede interesar</h3>
+          </div>
+          <div class="article-related-grid" id="article-related-grid">
+            <div class="shimmer-placeholder" style="height: 140px;"></div>
+            <div class="shimmer-placeholder" style="height: 140px;"></div>
+            <div class="shimmer-placeholder" style="height: 140px;"></div>
+          </div>
+        </section>
+
+        <!-- Botón: Subir al inicio y ver menú -->
+        <div class="article-footer-actions">
+          <button class="btn-article-scroll-top" id="btn-article-scroll-top" aria-label="Volver arriba y ver menú">
+            <i class="fa-solid fa-arrow-up"></i> Subir al inicio y ver menú
+          </button>
+        </div>
       `;
       
       // Configurar evento para copiar enlace
@@ -818,10 +837,159 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
+      // Configurar botón para subir al inicio y ver menú
+      const scrollTopBtn = elements.articleDetailContent.querySelector('#btn-article-scroll-top');
+      if (scrollTopBtn) {
+        scrollTopBtn.addEventListener('click', () => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      }
+
+      // Cargar noticias recomendadas (2 de la misma categoría + 1 relacionada por tema)
+      cargarNoticiasRecomendadas(noticia);
+
       // Actualizar contadores del Home de forma transparente
       fetchNoticiasTicker();
     } catch (error) {
       elements.articleDetailContent.innerHTML = '<p>Error al cargar el artículo.</p>';
+    }
+  }
+
+  // Carga de las 3 recomendaciones al pie del artículo
+  async function cargarNoticiasRecomendadas(noticiaActual) {
+    const container = document.getElementById('article-related-grid');
+    if (!container) return;
+
+    try {
+      // 1. Obtener noticias de la misma categoría y noticias generales
+      const [resCat, resGen] = await Promise.all([
+        fetch(`/api/noticias?categoria=${encodeURIComponent(noticiaActual.categoria_slug || '')}&limite=15`),
+        fetch(`/api/noticias?limite=30`)
+      ]);
+      
+      const noticiasCat = await resCat.json();
+      const noticiasGen = await resGen.json();
+
+      // Filtrar la noticia actual
+      const otrasDeCategoria = (Array.isArray(noticiasCat) ? noticiasCat : []).filter(n => n.id !== noticiaActual.id);
+      const todasOtras = (Array.isArray(noticiasGen) ? noticiasGen : []).filter(n => n.id !== noticiaActual.id);
+
+      // 2. Extraer palabras clave del título para encontrar la relacionada por tema
+      const stopwords = new Set([
+        'para', 'como', 'sobre', 'este', 'esta', 'estos', 'estas', 'desde', 'hasta', 'entre',
+        'hacia', 'segun', 'contra', 'donde', 'cuando', 'quien', 'porque', 'villa', 'pehuenia',
+        'moquehue', 'neuquen', 'nuevo', 'nueva', 'noticia', 'diario', 'online', 'anos', 'tras',
+        'gran', 'mas', 'menos', 'pero', 'sino', 'ante', 'bajo', 'cabe', 'mediante', 'durante'
+      ]);
+
+      const palabrasClave = (noticiaActual.titulo || '')
+        .toLowerCase()
+        .replace(/[^\w\sáéíóúüñ]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length >= 4 && !stopwords.has(w));
+
+      // 3. Seleccionar las 2 noticias actualizadas de la misma categoría
+      const seleccionadas = [];
+      const seleccionadasIds = new Set([noticiaActual.id]);
+
+      // Primeras 2 de la categoría
+      for (const n of otrasDeCategoria) {
+        if (seleccionadas.length < 2) {
+          seleccionadas.push({ ...n, esRelacionadaTema: false });
+          seleccionadasIds.add(n.id);
+        }
+      }
+
+      // Si no hubo suficientes de la misma categoría, rellenar de generales
+      if (seleccionadas.length < 2) {
+        for (const n of todasOtras) {
+          if (seleccionadas.length < 2 && !seleccionadasIds.has(n.id)) {
+            seleccionadas.push({ ...n, esRelacionadaTema: false });
+            seleccionadasIds.add(n.id);
+          }
+        }
+      }
+
+      // 4. Buscar 1 noticia relacionada por tema (que no esté ya seleccionada)
+      let mejorRelacionada = null;
+      let maxCoincidencias = 0;
+
+      for (const n of todasOtras) {
+        if (seleccionadasIds.has(n.id)) continue;
+
+        const textoABuscar = `${n.titulo || ''} ${n.copete || ''}`.toLowerCase();
+        let coincidencias = 0;
+
+        for (const kw of palabrasClave) {
+          if (textoABuscar.includes(kw)) {
+            coincidencias++;
+          }
+        }
+
+        if (coincidencias > maxCoincidencias) {
+          maxCoincidencias = coincidencias;
+          mejorRelacionada = n;
+        }
+      }
+
+      // Si no encontramos una con palabras clave, tomar la siguiente más relevante/reciente
+      if (!mejorRelacionada) {
+        mejorRelacionada = todasOtras.find(n => !seleccionadasIds.has(n.id));
+      }
+
+      if (mejorRelacionada) {
+        seleccionadas.push({ 
+          ...mejorRelacionada, 
+          esRelacionadaTema: maxCoincidencias > 0 
+        });
+        seleccionadasIds.add(mejorRelacionada.id);
+      }
+
+      // 5. Renderizar las 3 tarjetas en el contenedor
+      if (seleccionadas.length === 0) {
+        const sec = document.querySelector('.article-related-section');
+        if (sec) sec.style.display = 'none';
+        return;
+      }
+
+      container.innerHTML = '';
+      seleccionadas.slice(0, 3).forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'article-related-card';
+
+        const defaultImg = 'https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=300';
+        const rawImg = item.imagen_url || defaultImg;
+        const imagen = getOptimizedImageUrl(rawImg, 300, 75);
+        const fecha = new Date(item.fecha).toLocaleDateString('es-AR');
+        const badgeTexto = item.esRelacionadaTema ? 'Mismo tema' : (item.categoria_nombre || item.categoria_name || 'Noticia');
+        const badgeClass = item.esRelacionadaTema ? 'article-related-badge badge-match' : 'article-related-badge';
+
+        card.innerHTML = `
+          <div class="article-related-thumb">
+            <img src="${imagen}" alt="${item.titulo}" loading="lazy" decoding="async">
+            <span class="${badgeClass}">${badgeTexto}</span>
+          </div>
+          <div class="article-related-body">
+            <h4 class="article-related-title">${item.titulo}</h4>
+            <div class="article-related-meta">
+              <span><i class="fa-regular fa-calendar"></i> ${fecha}</span>
+              ${item.visitas !== undefined ? `<span>• <i class="fa-regular fa-eye"></i> ${item.visitas}</span>` : ''}
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          window.location.hash = '#/noticia/' + item.id;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        container.appendChild(card);
+      });
+
+    } catch (err) {
+      console.error('Error al cargar noticias recomendadas:', err);
+      const sec = document.querySelector('.article-related-section');
+      if (sec) sec.style.display = 'none';
     }
   }
 

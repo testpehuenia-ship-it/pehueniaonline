@@ -483,6 +483,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
   filter: grayscale(15%) contrast(102%);
 }
 
@@ -492,7 +493,7 @@ img {
   left: 0;
   right: 0;
   padding: 24px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.3) 60%, transparent 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.4) 45%, rgba(0, 0, 0, 0.05) 75%, transparent 100%);
   color: var(--text-light);
   display: flex;
   flex-direction: column;
@@ -673,6 +674,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
 }
 
 .post-card:hover .post-card-thumb img {
@@ -760,6 +762,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
 }
 
 .post-list-content {
@@ -1050,7 +1053,7 @@ img {
   border-radius: var(--border-radius-md);
   overflow: hidden;
   background-color: var(--bg-tertiary);
-  max-height: 480px;
+  max-height: 540px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1058,8 +1061,11 @@ img {
 
 .article-main-image img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 540px;
+  object-fit: contain;
+  object-position: center 20%;
+  display: block;
 }
 
 .article-body {
@@ -1079,6 +1085,7 @@ img {
   max-width: 100%;
   height: auto;
   border-radius: var(--border-radius-md);
+  object-fit: contain;
 }
 
 .article-body blockquote {
@@ -1091,6 +1098,212 @@ img {
   color: var(--text-secondary);
   font-style: italic;
   text-align: left;
+}
+
+/* ==========================================
+   SECCIÓN: TE PUEDE INTERESAR (Recomendaciones)
+   ========================================== */
+.article-related-section {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 2px solid var(--border-color);
+}
+
+.article-related-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.article-related-header h3 {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.article-related-header h3::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 20px;
+  background-color: var(--color-orange);
+  border-radius: 2px;
+}
+
+.article-related-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.article-related-card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-ease);
+}
+
+.article-related-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--color-orange);
+}
+
+.article-related-thumb {
+  position: relative;
+  width: 100%;
+  height: 125px;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+}
+
+.article-related-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  transition: transform 0.4s ease;
+}
+
+.article-related-card:hover .article-related-thumb img {
+  transform: scale(1.06);
+}
+
+.article-related-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: var(--border-radius-sm);
+}
+
+.article-related-badge.badge-match {
+  background-color: var(--color-orange);
+  color: #fff;
+}
+
+.article-related-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: space-between;
+}
+
+.article-related-title {
+  font-family: var(--font-serif);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color 0.2s ease;
+}
+
+.article-related-card:hover .article-related-title {
+  color: var(--color-orange);
+}
+
+.article-related-meta {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 768px) {
+  .article-related-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .article-related-card {
+    flex-direction: row;
+    height: 96px;
+  }
+  .article-related-thumb {
+    width: 100px;
+    height: 100%;
+    flex-shrink: 0;
+  }
+  .article-related-body {
+    padding: 10px;
+  }
+  .article-related-title {
+    font-size: 0.82rem;
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* ==========================================
+   BOTÓN: SUBIR AL INICIO Y VER MENÚ
+   ========================================== */
+.article-footer-actions {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-article-scroll-top {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #175d9e 100%);
+  color: #ffffff;
+  border: none;
+  padding: 12px 28px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(30, 115, 190, 0.35);
+  transition: var(--transition-ease);
+}
+
+.btn-article-scroll-top i {
+  font-size: 0.95rem;
+  transition: transform 0.25s ease;
+}
+
+.btn-article-scroll-top:hover {
+  background: linear-gradient(135deg, var(--color-orange) 0%, #d35400 100%);
+  box-shadow: 0 6px 18px rgba(230, 81, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-article-scroll-top:hover i {
+  transform: translateY(-3px);
+}
+
+.btn-article-scroll-top:active {
+  transform: translateY(0);
 }
 
 /* ==========================================
@@ -1494,6 +1707,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
   position: absolute;
   top: 0;
   left: 0;
@@ -1883,6 +2097,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
 }
 
 .compact-post-content {
@@ -2006,6 +2221,7 @@ img {
   width: 100%;
   height: 380px;
   object-fit: cover;
+  object-position: center 20%;
 }
 
 .post-card-large-image-body {
@@ -2045,7 +2261,7 @@ img {
 
 .post-card-title-overlay {
   position: relative;
-  height: 300px;
+  height: 320px;
   border-radius: var(--border-radius-md);
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -2063,6 +2279,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
   transition: var(--transition-ease);
 }
 
@@ -2076,7 +2293,7 @@ img {
   left: 0;
   right: 0;
   height: 100%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.55) 45%, rgba(0, 0, 0, 0.1) 75%, transparent 100%);
   color: #ffffff;
   padding: 24px;
   display: flex;
@@ -2107,7 +2324,7 @@ img {
 
 @media (max-width: 768px) {
   .post-card-title-overlay {
-    height: 200px;
+    height: 220px;
   }
   .post-card-title-overlay-title {
     font-size: 0.95rem;
@@ -2165,6 +2382,7 @@ img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
 }
 
 .post-card-carousel-infinite-body {
