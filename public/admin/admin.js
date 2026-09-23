@@ -674,6 +674,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // GESTIÓN DE PUBLICIDAD (CRUD)
   // ==========================================
 
+  function parseUrlsPublicidad(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    const text = String(raw).trim();
+    if (!text) return [];
+
+    // 1. Si tiene saltos de línea
+    if (text.includes('\n')) {
+      return text.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    // 2. Si tiene el delimitador |||
+    if (text.includes('|||')) {
+      return text.split('|||').map(s => s.trim()).filter(Boolean);
+    }
+    // 3. Si contiene data URIs Base64
+    if (text.startsWith('data:image') || text.startsWith('data:video')) {
+      const dataMatches = text.match(/data:(image|video)\/[^;]+;base64,[a-zA-Z0-9+/=]+/g);
+      if (dataMatches && dataMatches.length > 0) return dataMatches;
+      return [text];
+    }
+    // 4. Si contiene URLs http separadas por comas
+    if (text.includes(',')) {
+      return text.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [text];
+  }
+
   async function fetchPublicidadesList() {
     try {
       const res = await fetch('/api/admin/publicidades?_t=' + Date.now());
@@ -681,15 +708,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       el.pubTableBody.innerHTML = '';
       if (publicidades.length === 0) {
-        el.pubTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No hay publicidades registradas.</td></tr>';
+        el.pubTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px;">No hay publicidades registradas.</td></tr>';
         return;
       }
 
       publicidades.forEach(pub => {
         const tr = document.createElement('tr');
-        
-        const badgeClass = pub.activo === 1 ? 'badge-published' : 'badge-draft';
-        const badgeLabel = pub.activo === 1 ? 'Activo' : 'Inactivo';
         
         let tipoLabel = pub.tipo;
         if (pub.tipo === 'P-Superior') tipoLabel = 'P-Superior (Banner Superior 1200x200)';
@@ -709,18 +733,50 @@ document.addEventListener('DOMContentLoaded', () => {
           tipoLabel = pub.tipo.replace('banner_', 'Banner ').replace('popup', 'Popup Flotante');
         }
 
+        const urls = parseUrlsPublicidad(pub.url_archivo);
+        const firstUrl = urls[0] || '';
+        let thumbHtml = '<div style="width:70px; height:45px; background:var(--bg-tertiary); display:flex; align-items:center; justify-content:center; border-radius:4px; font-size:10px; color:var(--text-muted); margin:0 auto;">Sin archivo</div>';
+        
+        if (firstUrl) {
+          const isVid = pub.formato === 'video' || firstUrl.match(/\.(mp4|webm|ogg)$/i);
+          if (isVid) {
+            thumbHtml = `<video src="${firstUrl}" style="max-width:80px; max-height:48px; border-radius:4px; border:1px solid var(--border-color); object-fit:contain; display:block; margin:0 auto;" muted></video>`;
+          } else {
+            thumbHtml = `<img src="${firstUrl}" style="max-width:80px; max-height:48px; border-radius:4px; border:1px solid var(--border-color); object-fit:contain; display:block; margin:0 auto;" alt="Anuncio">`;
+          }
+        }
+
+        if (urls.length > 1) {
+          thumbHtml = `
+            <div style="position:relative; display:inline-block;">
+              ${thumbHtml}
+              <span style="position:absolute; bottom:-4px; right:-4px; background:var(--color-orange); color:#fff; font-size:9px; padding:1px 5px; border-radius:8px; font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,0.3);" title="${urls.length} archivos en rotación">+${urls.length}</span>
+            </div>
+          `;
+        }
+
+        const isActivo = pub.activo === 1;
+
         tr.innerHTML = `
+          <td style="text-align:center; vertical-align:middle;">${thumbHtml}</td>
           <td style="font-weight:600">${pub.nombre}</td>
-          <td>${tipoLabel}</td>
+          <td><span style="font-size:0.82rem; color:var(--text-secondary);">${tipoLabel}</span></td>
           <td><span class="badge badge-published" style="background-color:var(--bg-tertiary); color:var(--text-secondary); text-transform:uppercase">${pub.formato}</span></td>
-          <td><a href="${pub.url_destino}" target="_blank" style="color:var(--color-primary); text-decoration:underline">${pub.url_destino}</a></td>
-          <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
-          <td>
-            <button class="btn btn-outline btn-editar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-regular fa-pen-to-square"></i></button>
-            <button class="btn btn-danger btn-eliminar" style="padding:4px 8px; font-size:0.75rem;"><i class="fa-regular fa-trash-can"></i></button>
+          <td><a href="${pub.url_destino}" target="_blank" style="color:var(--color-primary); text-decoration:underline; font-size:0.8rem; display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${pub.url_destino}</a></td>
+          <td style="text-align:center; vertical-align:middle;">
+            <button type="button" class="btn btn-toggle-visibilidad" data-id="${pub.id}" data-activo="${pub.activo}" style="padding:5px 12px; font-size:0.75rem; border-radius:14px; cursor:pointer; font-weight:600; border:1px solid ${isActivo ? '#10b981' : '#ef4444'}; background:${isActivo ? '#ecfdf5' : '#fef2f2'}; color:${isActivo ? '#059669' : '#dc2626'}; transition:all 0.2s;" title="Clic para ${isActivo ? 'Ocultar' : 'Mostrar'}">
+              <i class="fa-solid ${isActivo ? 'fa-eye' : 'fa-eye-slash'}"></i> ${isActivo ? 'Visible (Activo)' : 'Oculto (Inactivo)'}
+            </button>
+          </td>
+          <td style="text-align:center; vertical-align:middle;">
+            <div style="display:flex; gap:6px; justify-content:center;">
+              <button class="btn btn-outline btn-editar" title="Editar Campaña" style="padding:5px 9px; font-size:0.8rem;"><i class="fa-regular fa-pen-to-square"></i></button>
+              <button class="btn btn-danger btn-eliminar" title="Eliminar Publicidad" style="padding:5px 9px; font-size:0.8rem;"><i class="fa-regular fa-trash-can"></i></button>
+            </div>
           </td>
         `;
 
+        tr.querySelector('.btn-toggle-visibilidad').addEventListener('click', () => toggleVisibilidadPublicidad(pub));
         tr.querySelector('.btn-editar').addEventListener('click', () => abrirModalPublicidad(pub));
         tr.querySelector('.btn-eliminar').addEventListener('click', () => eliminarPublicidad(pub.id));
 
@@ -728,7 +784,34 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } catch (e) {
       console.error('Error al cargar listado de anuncios:', e);
-      el.pubTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--color-danger)">Error al cargar publicidades.</td></tr>';
+      el.pubTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--color-danger)">Error al cargar publicidades.</td></tr>';
+    }
+  }
+
+  async function toggleVisibilidadPublicidad(pub) {
+    const nuevoEstado = pub.activo === 1 ? 0 : 1;
+    const payload = {
+      nombre: pub.nombre,
+      tipo: pub.tipo,
+      formato: pub.formato,
+      url_archivo: pub.url_archivo,
+      url_destino: pub.url_destino,
+      activo: nuevoEstado
+    };
+
+    try {
+      const res = await fetch(`/api/admin/publicidades/${pub.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        fetchPublicidadesList();
+      } else {
+        alert('No se pudo cambiar el estado de visibilidad.');
+      }
+    } catch (err) {
+      console.error('Error al togglear visibilidad:', err);
     }
   }
 
@@ -761,45 +844,70 @@ document.addEventListener('DOMContentLoaded', () => {
     el.previsualizacionPub.innerHTML = '';
     if (!urlsString) return;
     
-    const urls = urlsString.split(',').map(u => u.trim()).filter(Boolean);
+    const urls = parseUrlsPublicidad(urlsString);
     if (urls.length === 0) return;
 
     const container = document.createElement('div');
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
-    container.style.gap = '8px';
+    container.style.gap = '10px';
     container.style.width = '100%';
+
+    const headerNote = document.createElement('div');
+    headerNote.style.display = 'flex';
+    headerNote.style.justifyContent = 'space-between';
+    headerNote.style.alignItems = 'center';
+    headerNote.style.fontSize = '0.8rem';
+    headerNote.style.color = 'var(--text-secondary)';
+    headerNote.innerHTML = `<span><strong>${urls.length} archivo(s) cargado(s)</strong></span><span style="font-size:0.75rem; color:var(--text-muted)">Puedes eliminar individualmente</span>`;
+    container.appendChild(headerNote);
 
     const itemsWrapper = document.createElement('div');
     itemsWrapper.style.display = 'flex';
-    itemsWrapper.style.flexWrap = 'wrap';
-    itemsWrapper.style.gap = '10px';
-    itemsWrapper.style.alignItems = 'center';
+    itemsWrapper.style.flexDirection = 'column';
+    itemsWrapper.style.gap = '8px';
 
     urls.forEach((url, index) => {
       const item = document.createElement('div');
-      item.style.position = 'relative';
-      item.style.display = 'inline-block';
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.justifyContent = 'space-between';
+      item.style.padding = '8px 12px';
       item.style.border = '1px solid var(--border-color)';
       item.style.borderRadius = '6px';
-      item.style.overflow = 'hidden';
       item.style.background = 'var(--bg-secondary)';
-      item.style.boxShadow = 'var(--shadow-sm)';
+      item.style.gap = '12px';
       
       let mediaHtml = '';
       const isVid = formato === 'video' || url.match(/\.(mp4|webm|ogg)$/i);
       if (isVid) {
-        mediaHtml = `<video src="${url}" autoplay loop muted playsinline style="max-width:140px; max-height:90px; display:block; object-fit:contain;"></video>`;
+        mediaHtml = `<video src="${url}" autoplay loop muted playsinline style="max-width:110px; max-height:60px; border-radius:4px; display:block; object-fit:contain;"></video>`;
       } else {
-        mediaHtml = `<img src="${url}" style="max-width:140px; max-height:90px; display:block; object-fit:contain;">`;
+        mediaHtml = `<img src="${url}" style="max-width:110px; max-height:60px; border-radius:4px; display:block; object-fit:contain;" alt="Banner #${index+1}">`;
       }
 
       item.innerHTML = `
-        <div style="position:relative">
-          <span style="position:absolute; top:3px; left:3px; background:rgba(0,0,0,0.75); color:#fff; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:bold; z-index:2;">#${index+1}</span>
-          ${mediaHtml}
+        <div style="display:flex; align-items:center; gap:12px; flex:1; overflow:hidden;">
+          <span style="background:var(--color-primary); color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; font-weight:bold;">#${index+1}</span>
+          <div style="width:110px; height:60px; display:flex; align-items:center; justify-content:center; background:var(--bg-tertiary); border-radius:4px; overflow:hidden;">
+            ${mediaHtml}
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+            ${url.startsWith('data:') ? 'Archivo local (Base64)' : url}
+          </div>
         </div>
+        <button type="button" class="btn btn-outline btn-eliminar-archivo" data-index="${index}" style="padding:4px 8px; font-size:0.75rem; color:var(--color-danger); border-color:var(--color-danger); cursor:pointer;" title="Eliminar este archivo">
+          <i class="fa-solid fa-trash-can"></i> Quitar
+        </button>
       `;
+
+      item.querySelector('.btn-eliminar-archivo').addEventListener('click', () => {
+        const nuevasUrls = urls.filter((_, i) => i !== index);
+        const nuevoTexto = nuevasUrls.join('\n');
+        el.pubUrlArchivo.value = nuevoTexto;
+        actualizarPrevisualizacionPub(nuevoTexto, formato);
+      });
+
       itemsWrapper.appendChild(item);
     });
 
@@ -810,7 +918,10 @@ document.addEventListener('DOMContentLoaded', () => {
       tip.style.fontSize = '0.78rem';
       tip.style.color = 'var(--color-primary)';
       tip.style.fontWeight = '500';
-      tip.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> <strong>${urls.length} archivos vinculados:</strong> Se mostrarán rotando en secuencia animada de forma automática en este espacio publicitario.`;
+      tip.style.padding = '6px 8px';
+      tip.style.background = 'rgba(var(--color-primary-rgb, 37, 99, 235), 0.08)';
+      tip.style.borderRadius = '4px';
+      tip.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> <strong>Rotación activa:</strong> Se mostrarán uno tras otro con animación continua en el diario.`;
       container.appendChild(tip);
     }
 
@@ -839,7 +950,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 2. Subir vía backend con soporte a Catbox/Fallback
+    // 2. Subir vía backend
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -858,7 +969,6 @@ document.addEventListener('DOMContentLoaded', () => {
               const parsed = JSON.parse(errText);
               errMsg = parsed.error || errMsg;
             } catch (e) {}
-            // Si el backend falla, retornamos el Base64 directamente para que nunca se quede trabado
             console.warn('Subida backend falló, usando Base64 directo:', errMsg);
             return resolve(base64Content);
           }
@@ -909,10 +1019,12 @@ document.addEventListener('DOMContentLoaded', () => {
         el.pubFormato.value = 'imagen';
       }
 
-      // Si ya había URLs cargadas, permitir combinarlas o reemplazarlas
-      const urlsFinales = urlsSubidas.join(', ');
-      el.pubUrlArchivo.value = urlsFinales;
+      // Combinar con URLs existentes si las hay
+      const existentes = parseUrlsPublicidad(el.pubUrlArchivo.value);
+      const combinadas = [...existentes, ...urlsSubidas];
+      const urlsFinales = combinadas.join('\n');
       
+      el.pubUrlArchivo.value = urlsFinales;
       actualizarPrevisualizacionPub(urlsFinales, el.pubFormato.value);
     } catch (err) {
       console.error('Error al subir archivos de publicidad:', err);

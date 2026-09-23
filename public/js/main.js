@@ -1182,6 +1182,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function parseUrlsPublicidad(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    const text = String(raw).trim();
+    if (!text) return [];
+
+    // 1. Si tiene saltos de línea
+    if (text.includes('\n')) {
+      return text.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    // 2. Si tiene el delimitador |||
+    if (text.includes('|||')) {
+      return text.split('|||').map(s => s.trim()).filter(Boolean);
+    }
+    // 3. Si contiene data URIs Base64
+    if (text.startsWith('data:image') || text.startsWith('data:video')) {
+      const dataMatches = text.match(/data:(image|video)\/[^;]+;base64,[a-zA-Z0-9+/=]+/g);
+      if (dataMatches && dataMatches.length > 0) return dataMatches;
+      return [text];
+    }
+    // 4. Si contiene URLs http separadas por comas
+    if (text.includes(',')) {
+      return text.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [text];
+  }
+
   function obtenerPublicidadParaPosicion(posicion) {
     const items = obtenerTodasPublicidadesParaPosicion(posicion);
     if (items.length === 0) return null;
@@ -1195,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const items = [];
     matchingAds.forEach(ad => {
       if (!ad.url_archivo) return;
-      const urls = ad.url_archivo.split(',').map(u => u.trim()).filter(Boolean);
+      const urls = parseUrlsPublicidad(ad.url_archivo);
       urls.forEach(url => {
         items.push({
           ...ad,
