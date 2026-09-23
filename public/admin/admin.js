@@ -676,28 +676,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function parseUrlsPublicidad(raw) {
     if (!raw) return [];
-    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (Array.isArray(raw)) return raw.filter(u => typeof u === 'string' && u.trim().length > 10);
     const text = String(raw).trim();
     if (!text) return [];
 
-    // 1. Si tiene saltos de línea
-    if (text.includes('\n')) {
-      return text.split('\n').map(s => s.trim()).filter(Boolean);
-    }
-    // 2. Si tiene el delimitador |||
-    if (text.includes('|||')) {
-      return text.split('|||').map(s => s.trim()).filter(Boolean);
-    }
-    // 3. Si contiene data URIs Base64
-    if (text.startsWith('data:image') || text.startsWith('data:video')) {
-      const dataMatches = text.match(/data:(image|video)\/[^;]+;base64,[a-zA-Z0-9+/=]+/g);
-      if (dataMatches && dataMatches.length > 0) return dataMatches;
+    // Caso 1: Si es un Data URI (Base64)
+    if (text.startsWith('data:')) {
+      if (text.includes('\n') || text.includes('|||')) {
+        const parts = text.split(/\n|\|\|\|/).map(s => s.trim()).filter(Boolean);
+        return parts.filter(p => p.length > 30);
+      }
       return [text];
     }
-    // 4. Si contiene URLs http separadas por comas
-    if (text.includes(',')) {
-      return text.split(',').map(s => s.trim()).filter(Boolean);
+
+    // Caso 2: Si tiene saltos de línea (\n) o delimitador (|||)
+    if (text.includes('\n') || text.includes('|||')) {
+      return text.split(/\n|\|\|\|/).map(s => s.trim()).filter(s => s.length > 5);
     }
+
+    // Caso 3: Si contiene comas (puede ser lista de URLs o un base64 partido por coma previamente)
+    if (text.includes(',')) {
+      const parts = text.split(',').map(s => s.trim()).filter(Boolean);
+      const reconstructed = [];
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (part.startsWith('data:') && i + 1 < parts.length && !parts[i + 1].startsWith('http') && !parts[i + 1].startsWith('/')) {
+          reconstructed.push(part + ',' + parts[i + 1]);
+          i++; // saltar payload
+        } else if (part.startsWith('http') || part.startsWith('/') || part.startsWith('data:')) {
+          reconstructed.push(part);
+        }
+      }
+      if (reconstructed.length > 0) return reconstructed;
+    }
+
     return [text];
   }
 

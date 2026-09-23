@@ -1184,28 +1184,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function parseUrlsPublicidad(raw) {
     if (!raw) return [];
-    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (Array.isArray(raw)) return raw.filter(u => typeof u === 'string' && u.trim().length > 10);
     const text = String(raw).trim();
     if (!text) return [];
 
-    // 1. Si tiene saltos de línea
-    if (text.includes('\n')) {
-      return text.split('\n').map(s => s.trim()).filter(Boolean);
-    }
-    // 2. Si tiene el delimitador |||
-    if (text.includes('|||')) {
-      return text.split('|||').map(s => s.trim()).filter(Boolean);
-    }
-    // 3. Si contiene data URIs Base64
-    if (text.startsWith('data:image') || text.startsWith('data:video')) {
-      const dataMatches = text.match(/data:(image|video)\/[^;]+;base64,[a-zA-Z0-9+/=]+/g);
-      if (dataMatches && dataMatches.length > 0) return dataMatches;
+    // Caso 1: Si es un Data URI (Base64)
+    if (text.startsWith('data:')) {
+      if (text.includes('\n') || text.includes('|||')) {
+        const parts = text.split(/\n|\|\|\|/).map(s => s.trim()).filter(Boolean);
+        return parts.filter(p => p.length > 30);
+      }
       return [text];
     }
-    // 4. Si contiene URLs http separadas por comas
-    if (text.includes(',')) {
-      return text.split(',').map(s => s.trim()).filter(Boolean);
+
+    // Caso 2: Si tiene saltos de línea (\n) o delimitador (|||)
+    if (text.includes('\n') || text.includes('|||')) {
+      return text.split(/\n|\|\|\|/).map(s => s.trim()).filter(s => s.length > 5);
     }
+
+    // Caso 3: Si contiene comas (puede ser lista de URLs o un base64 partido por coma previamente)
+    if (text.includes(',')) {
+      const parts = text.split(',').map(s => s.trim()).filter(Boolean);
+      const reconstructed = [];
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (part.startsWith('data:') && i + 1 < parts.length && !parts[i + 1].startsWith('http') && !parts[i + 1].startsWith('/')) {
+          reconstructed.push(part + ',' + parts[i + 1]);
+          i++; // saltar payload
+        } else if (part.startsWith('http') || part.startsWith('/') || part.startsWith('data:')) {
+          reconstructed.push(part);
+        }
+      }
+      if (reconstructed.length > 0) return reconstructed;
+    }
+
     return [text];
   }
 
@@ -1224,21 +1236,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!ad.url_archivo) return;
       const urls = parseUrlsPublicidad(ad.url_archivo);
       urls.forEach(url => {
-        items.push({
-          ...ad,
-          url_archivo: url
-        });
+        if (url && url.length > 10) {
+          items.push({
+            ...ad,
+            url_archivo: url
+          });
+        }
       });
     });
     return items;
   }
 
   function createAdMarkup(ad) {
-    if (!ad) return '';
+    if (!ad || !ad.url_archivo) return '';
     
     const mediaHtml = ad.formato === 'video' 
       ? `<video src="${ad.url_archivo}" autoplay loop muted playsinline></video>`
-      : `<img src="${ad.url_archivo}" alt="${ad.nombre}" loading="lazy" decoding="async">`;
+      : `<img src="${ad.url_archivo}" alt="${ad.nombre || 'Anuncio'}" loading="lazy" decoding="async">`;
 
     return `
       <a href="${ad.url_destino}" target="_blank" class="ad-link">
@@ -1256,7 +1270,14 @@ document.addEventListener('DOMContentLoaded', () => {
       adRotatorIntervals.delete(container);
     }
 
-    if (!items || items.length === 0) {
+    // Filtrar items para asegurar que tienen URL válida y con contenido real
+    const validItems = (items || []).filter(item => {
+      if (!item || !item.url_archivo) return false;
+      const u = item.url_archivo.trim();
+      return u.length > 15 && (u.startsWith('http') || u.startsWith('/') || u.startsWith('data:image') || u.startsWith('data:video'));
+    });
+
+    if (validItems.length === 0) {
       container.style.display = 'none';
       container.innerHTML = '';
       return;
@@ -1265,24 +1286,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (baseClass) container.className = baseClass;
     container.style.display = 'flex';
 
-    if (items.length === 1) {
-      container.innerHTML = createAdMarkup(items[0]);
+    if (validItems.length === 1) {
+      container.innerHTML = createAdMarkup(validItems[0]);
       return;
     }
 
-    // Múltiples anuncios/GIFs: Renderizar Rotador animado automático
+    // Múltiples anuncios/GIFs reales: Renderizar Rotador animado automático
     let activeIdx = 0;
     const rotator = document.createElement('div');
     rotator.className = 'ad-rotator-container';
     
     rotator.innerHTML = `
-      ${items.map((ad, idx) => `
+      ${validItems.map((ad, idx) => `
         <div class="ad-rotator-slide ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
           ${createAdMarkup(ad)}
         </div>
       `).join('')}
       <div class="ad-rotator-dots">
-        ${items.map((_, idx) => `<span class="ad-rotator-dot ${idx === 0 ? 'active' : ''}"></span>`).join('')}
+        ${validItems.map((_, idx) => `<span class="ad-rotator-dot ${idx === 0 ? 'active' : ''}"></span>`).join('')}
       </div>
     `;
 
@@ -1293,6 +1314,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dots = rotator.querySelectorAll('.ad-rotator-dot');
 
     const nextSlide = () => {
+      if (slides.length <= 1) return;
       slides[activeIdx].classList.remove('active');
       dots[activeIdx].classList.remove('active');
       activeIdx = (activeIdx + 1) % slides.length;
