@@ -207,6 +207,11 @@ db.serialize(() => {
     )
   `);
 
+  // Índices para acelerar búsquedas, ordenamientos y purgas de noticias
+  db.run("CREATE INDEX IF NOT EXISTS idx_noticias_fecha ON noticias (fecha DESC)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_noticias_estado_fecha ON noticias (estado, fecha DESC)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_noticias_categoria_estado ON noticias (categoria_id, estado, fecha DESC)");
+
   // 3. Tabla de Campañas de Importación (WPeMatico-style)
   db.run(`
     CREATE TABLE IF NOT EXISTS campanas (

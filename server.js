@@ -908,6 +908,9 @@ async function procesarCampana(campanaId) {
           }
         }
 
+        // Purgar noticias con más de 5 días de antigüedad para mantener la base de datos ligera
+        purgarNoticiasAntiguas(5);
+
         // Actualizar la última fecha de ejecución de la campaña
         const ahora = new Date().toISOString();
         await new Promise((res) => {
@@ -937,12 +940,36 @@ async function procesarCampana(campanaId) {
   });
 }
 
+// Función para purgar automáticamente noticias con más de X días de antigüedad
+function purgarNoticiasAntiguas(dias = 5) {
+  try {
+    const fechaLimite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+    db.run('DELETE FROM noticias WHERE fecha < ?', [fechaLimite], function(err) {
+      if (err) {
+        console.error(`Error al purgar noticias antiguas (> ${dias} días):`, err.message);
+      } else if (this && this.changes > 0) {
+        console.log(`🧹 Purgado de BD: Se eliminaron ${this.changes} noticias con más de ${dias} días de antigüedad.`);
+      }
+    });
+  } catch (e) {
+    console.error('Error al ejecutar purgarNoticiasAntiguas:', e.message);
+  }
+}
+
 // Programador automático de cron de campañas
 function inicializarCronCampanas() {
+  // Purgar noticias viejas en el arranque
+  purgarNoticiasAntiguas(5);
+
   // Cancelar tareas existentes
   Object.keys(cronTasks).forEach(key => {
     cronTasks[key].stop();
     delete cronTasks[key];
+  });
+
+  // Tarea recurrente cada 6 horas para asegurar la purga periódica de la base de datos
+  cronTasks['purge_old_news'] = cron.schedule('0 */6 * * *', () => {
+    purgarNoticiasAntiguas(5);
   });
 
   // Cargar campañas activas de la BD
@@ -980,6 +1007,7 @@ inicializarCronCampanas();
 // Endpoint de Vercel Cron para importación programada de campañas
 app.get('/api/cron', async (req, res) => {
   console.log('Ejecutando Cron Job de Importación desde /api/cron...');
+  purgarNoticiasAntiguas(5);
   
   db.all('SELECT id, frecuencia_minutos, ultima_ejecucion, estado FROM campanas WHERE estado = \'activa\'', async (err, campanas) => {
     if (err) {
