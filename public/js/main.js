@@ -395,20 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Determinar span de columna según el diseño
         const diseno = cat.diseno_home || 'grid';
-        let span = 3; // Por defecto ocupa todo (Carousel, Mosaic, Featured)
-        if (diseno === 'grid') span = 2;
+        let span = 3; // Ocupa las 3 columnas completas (Grid, Carousel, Mosaic, Featured, Large-image, Title-overlay, etc.)
         if (diseno === 'list') span = 1;
-
-        // Si agregar esta categoría excede el espacio de la fila actual (3 columnas),
-        // rellenamos la fila actual con un anuncio del tamaño adecuado antes de colocarla
-        if (filaOcupada > 0 && filaOcupada + span > 3) {
-          const espacioLibre = 3 - filaOcupada;
-          const adBlock = crearAdBlockGrid(espacioLibre);
-          if (adBlock) {
-            container.appendChild(adBlock);
-          }
-          filaOcupada = 0;
-        }
 
         // Crear contenedor de bloque de categoría
         const sectionBlock = document.createElement('section');

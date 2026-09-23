@@ -606,6 +606,10 @@ img {
 }
 
 /* Forzar cantidad de columnas en grilla interna según el espacio que ocupa el bloque */
+.cat-block-span-3 .posts-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .cat-block-span-2 .posts-grid {
   grid-template-columns: repeat(2, 1fr);
 }
@@ -638,11 +642,11 @@ img {
   background-color: var(--color-primary);
 }
 
-/* Grilla de Noticias Regular */
+/* Grilla de Noticias Regular (3 Columnas) */
 .posts-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
 }
 
 .post-card {
@@ -2292,7 +2296,18 @@ img {
   .ad-block-span-1 {
     grid-column: span 1 !important;
   }
+  .posts-grid,
+  .cat-block-span-3 .posts-grid,
   .cat-block-span-2 .posts-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .posts-grid,
+  .cat-block-span-3 .posts-grid,
+  .cat-block-span-2 .posts-grid,
+  .cat-block-span-1 .posts-grid {
     grid-template-columns: 1fr !important;
   }
 }
