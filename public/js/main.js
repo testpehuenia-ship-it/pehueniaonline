@@ -94,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cargar widgets de barra lateral
     renderClimaSemanal();
-    renderFixtureMundial();
     renderSidebarCategoriesDynamically();
 
     // Resolver ruta inicial según hash actual
@@ -495,26 +494,17 @@ document.addEventListener('DOMContentLoaded', () => {
         sectionBlock.appendChild(postsContainer);
         container.appendChild(sectionBlock);
 
-        // Actualizar filaOcupada
-        filaOcupada = (filaOcupada + span) % 3;
         indexC++;
 
-        // Inyectar un banner publicitario intermedio cada 2 categorías cargadas
-        if (indexC % 2 === 0) {
-          let espacioAnuncio = 3 - filaOcupada; // Puede ser 1, 2 o 3 (si filaOcupada es 0)
-          const adBlock = crearAdBlockGrid(espacioAnuncio);
-          if (adBlock) {
-            container.appendChild(adBlock);
-          }
-          filaOcupada = 0; // Al inyectar el anuncio para rellenar, la fila queda completa (0 col ocupadas)
-        }
-      }
+        // Buscar si existe publicidad asignada específicamente a esta categoría o posición
+        const adCategoria = obtenerPublicidadParaPosicion(`banner_cat_${cat.slug}`) || 
+                            obtenerPublicidadParaPosicion(`banner_cat_${cat.id}`) || 
+                            obtenerPublicidadParaPosicion(`P-Cat-${indexC}`);
 
-      // Si al finalizar las categorías quedó un espacio libre en la última fila, colocar un anuncio para completarla
-      if (filaOcupada > 0) {
-        const espacioLibre = 3 - filaOcupada;
-        const adBlock = crearAdBlockGrid(espacioLibre);
-        if (adBlock) {
+        if (adCategoria && adCategoria.url_archivo) {
+          const adBlock = document.createElement('div');
+          adBlock.className = 'ad-banner-category';
+          adBlock.innerHTML = createAdMarkup(adCategoria);
           container.appendChild(adBlock);
         }
       }
