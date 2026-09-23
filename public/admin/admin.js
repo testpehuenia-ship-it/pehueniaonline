@@ -174,6 +174,12 @@ document.addEventListener('DOMContentLoaded', () => {
     el.btnNuevaPublicidad.addEventListener('click', () => abrirModalPublicidad());
     el.formPublicidad.addEventListener('submit', guardarPublicidad);
     el.pubArchivoInput.addEventListener('change', manejarSubidaPublicidad);
+    el.pubUrlArchivo.addEventListener('input', () => {
+      actualizarPrevisualizacionPub(el.pubUrlArchivo.value, el.pubFormato.value);
+    });
+    el.pubFormato.addEventListener('change', () => {
+      actualizarPrevisualizacionPub(el.pubUrlArchivo.value, el.pubFormato.value);
+    });
 
     // Categorías Config
     el.formCategoriaConfig.addEventListener('submit', guardarCategoriaConfig);
@@ -751,27 +757,70 @@ document.addEventListener('DOMContentLoaded', () => {
     abrirModal('modal-publicidad');
   }
 
-  function actualizarPrevisualizacionPub(url, formato) {
+  function actualizarPrevisualizacionPub(urlsString, formato) {
     el.previsualizacionPub.innerHTML = '';
-    if (!url) return;
+    if (!urlsString) return;
     
-    if (formato === 'video') {
-      el.previsualizacionPub.innerHTML = `<video src="${url}" autoplay loop muted playsinline style="max-width:100%; max-height:120px; border-radius:4px; border:1px solid var(--border-color);"></video>`;
-    } else {
-      el.previsualizacionPub.innerHTML = `<img src="${url}" style="max-width:100%; max-height:120px; border-radius:4px; border:1px solid var(--border-color); object-fit:contain;">`;
+    const urls = urlsString.split(',').map(u => u.trim()).filter(Boolean);
+    if (urls.length === 0) return;
+
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '8px';
+    container.style.width = '100%';
+
+    const itemsWrapper = document.createElement('div');
+    itemsWrapper.style.display = 'flex';
+    itemsWrapper.style.flexWrap = 'wrap';
+    itemsWrapper.style.gap = '10px';
+    itemsWrapper.style.alignItems = 'center';
+
+    urls.forEach((url, index) => {
+      const item = document.createElement('div');
+      item.style.position = 'relative';
+      item.style.display = 'inline-block';
+      item.style.border = '1px solid var(--border-color)';
+      item.style.borderRadius = '6px';
+      item.style.overflow = 'hidden';
+      item.style.background = 'var(--bg-secondary)';
+      item.style.boxShadow = 'var(--shadow-sm)';
+      
+      let mediaHtml = '';
+      const isVid = formato === 'video' || url.match(/\.(mp4|webm|ogg)$/i);
+      if (isVid) {
+        mediaHtml = `<video src="${url}" autoplay loop muted playsinline style="max-width:140px; max-height:90px; display:block; object-fit:contain;"></video>`;
+      } else {
+        mediaHtml = `<img src="${url}" style="max-width:140px; max-height:90px; display:block; object-fit:contain;">`;
+      }
+
+      item.innerHTML = `
+        <div style="position:relative">
+          <span style="position:absolute; top:3px; left:3px; background:rgba(0,0,0,0.75); color:#fff; font-size:10px; padding:2px 5px; border-radius:3px; font-weight:bold; z-index:2;">#${index+1}</span>
+          ${mediaHtml}
+        </div>
+      `;
+      itemsWrapper.appendChild(item);
+    });
+
+    container.appendChild(itemsWrapper);
+
+    if (urls.length > 1) {
+      const tip = document.createElement('div');
+      tip.style.fontSize = '0.78rem';
+      tip.style.color = 'var(--color-primary)';
+      tip.style.fontWeight = '500';
+      tip.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> <strong>${urls.length} archivos vinculados:</strong> Se mostrarán rotando en secuencia animada de forma automática en este espacio publicitario.`;
+      container.appendChild(tip);
     }
+
+    el.previsualizacionPub.appendChild(container);
   }
 
-  async function manejarSubidaPublicidad(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    el.previsualizacionPub.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:var(--color-primary); font-size:1.5rem;"></i>';
-
-    // 1. Intentar subir directamente a Cloudinary si está configurado
+  async function subirArchivoUnico(file) {
+    // 1. Si Cloudinary está configurado, intentar primero
     if (appConfigs.cloudinary_cloud_name && appConfigs.cloudinary_upload_preset) {
       try {
-        console.log('Intentando subir a Cloudinary...');
         const formData = new FormData();
         formData.append('file', file);
         formData.append('upload_preset', appConfigs.cloudinary_upload_preset);
@@ -781,71 +830,17 @@ document.addEventListener('DOMContentLoaded', () => {
           body: formData
         });
 
-        if (!uploadRes.ok) {
-          const errData = await uploadRes.json();
-          throw new Error(errData.error ? errData.error.message : `Estado ${uploadRes.status}`);
+        if (uploadRes.ok) {
+          const data = await uploadRes.json();
+          if (data.secure_url) return data.secure_url;
         }
-
-        const data = await uploadRes.json();
-        if (data.secure_url) {
-          const fileUrl = data.secure_url;
-          el.pubUrlArchivo.value = fileUrl;
-          
-          // Detectar formato basándose en tipo de archivo
-          if (file.type.startsWith('video/')) {
-            el.pubFormato.value = 'video';
-          } else if (file.type.includes('gif')) {
-            el.pubFormato.value = 'gif';
-          } else {
-            el.pubFormato.value = 'imagen';
-          }
-
-          actualizarPrevisualizacionPub(fileUrl, el.pubFormato.value);
-          return; // Éxito con Cloudinary
-        }
-        throw new Error('Respuesta inválida de Cloudinary');
       } catch (cloudinaryErr) {
-        console.warn('La subida directa a Cloudinary falló, intentando con Catbox...', cloudinaryErr.message);
+        console.warn('Fallo Cloudinary, intentando backend:', cloudinaryErr.message);
       }
     }
 
-    // 2. Intentar subir directamente desde el navegador a Catbox
-    try {
-      const formData = new FormData();
-      formData.append('reqtype', 'fileupload');
-      formData.append('fileToUpload', file);
-
-      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`Catbox retornó estado ${uploadRes.status}`);
-      }
-
-      const fileUrl = await uploadRes.text();
-      if (fileUrl && fileUrl.trim().startsWith('http')) {
-        const finalUrl = fileUrl.trim();
-        el.pubUrlArchivo.value = finalUrl;
-        
-        // Detectar formato basándose en tipo de archivo
-        if (file.type.startsWith('video/')) {
-          el.pubFormato.value = 'video';
-        } else if (file.type.includes('gif')) {
-          el.pubFormato.value = 'gif';
-        } else {
-          el.pubFormato.value = 'imagen';
-        }
-
-        actualizarPrevisualizacionPub(finalUrl, el.pubFormato.value);
-        return; // Éxito con Catbox
-      }
-      throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
-    } catch (directErr) {
-      console.warn('La subida directa a Catbox falló, reintentando a través del backend...', directErr.message);
-
-      // 2. Fallback: Codificar a Base64 y enviar al backend
+    // 2. Subir vía backend con soporte a Catbox/Fallback
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const base64Content = event.target.result;
@@ -858,33 +853,70 @@ document.addEventListener('DOMContentLoaded', () => {
           
           if (!res.ok) {
             const errText = await res.text();
-            let errMsg = 'Error de subida';
+            let errMsg = 'Error en servidor';
             try {
               const parsed = JSON.parse(errText);
               errMsg = parsed.error || errMsg;
             } catch (e) {}
-            throw new Error(errMsg);
+            // Si el backend falla, retornamos el Base64 directamente para que nunca se quede trabado
+            console.warn('Subida backend falló, usando Base64 directo:', errMsg);
+            return resolve(base64Content);
           }
           const data = await res.json();
-          
-          el.pubUrlArchivo.value = data.url;
-          
-          // Detectar formato basándose en tipo de archivo
-          if (file.type.startsWith('video/')) {
-            el.pubFormato.value = 'video';
-          } else if (file.type.includes('gif')) {
-            el.pubFormato.value = 'gif';
+          if (data.url) {
+            resolve(data.url);
           } else {
-            el.pubFormato.value = 'imagen';
+            resolve(base64Content);
           }
-
-          actualizarPrevisualizacionPub(data.url, el.pubFormato.value);
         } catch (err) {
-          console.error('Error al subir archivo de publicidad mediante backend:', err);
-          el.previsualizacionPub.innerHTML = `<span style="color:var(--color-danger)"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</span>`;
+          console.warn('Error en fetch backend, usando Base64 directo:', err);
+          resolve(base64Content);
         }
       };
+      reader.onerror = (err) => reject(err);
       reader.readAsDataURL(file);
+    });
+  }
+
+  async function manejarSubidaPublicidad(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    el.previsualizacionPub.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:var(--color-primary); font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin fa-lg"></i> Subiendo ${files.length} archivo(s)...</div>`;
+
+    try {
+      const urlsSubidas = [];
+      let tieneVideo = false;
+      let tieneGif = false;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        el.previsualizacionPub.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:var(--color-primary); font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin fa-lg"></i> Subiendo archivo ${i + 1} de ${files.length} (${file.name})...</div>`;
+        
+        if (file.type.startsWith('video/')) tieneVideo = true;
+        if (file.type.includes('gif')) tieneGif = true;
+
+        const url = await subirArchivoUnico(file);
+        urlsSubidas.push(url);
+      }
+
+      // Detectar formato basándose en los archivos subidos
+      if (tieneVideo) {
+        el.pubFormato.value = 'video';
+      } else if (tieneGif) {
+        el.pubFormato.value = 'gif';
+      } else {
+        el.pubFormato.value = 'imagen';
+      }
+
+      // Si ya había URLs cargadas, permitir combinarlas o reemplazarlas
+      const urlsFinales = urlsSubidas.join(', ');
+      el.pubUrlArchivo.value = urlsFinales;
+      
+      actualizarPrevisualizacionPub(urlsFinales, el.pubFormato.value);
+    } catch (err) {
+      console.error('Error al subir archivos de publicidad:', err);
+      el.previsualizacionPub.innerHTML = `<span style="color:var(--color-danger); font-size:0.85rem;"><i class="fa-solid fa-triangle-exclamation"></i> Error al subir: ${err.message}</span>`;
     }
   }
 

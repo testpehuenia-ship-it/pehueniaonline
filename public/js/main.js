@@ -491,14 +491,16 @@ document.addEventListener('DOMContentLoaded', () => {
         indexC++;
 
         // Buscar si existe publicidad asignada específicamente a esta categoría o posición
-        const adCategoria = obtenerPublicidadParaPosicion(`banner_cat_${cat.slug}`) || 
-                            obtenerPublicidadParaPosicion(`banner_cat_${cat.id}`) || 
-                            obtenerPublicidadParaPosicion(`P-Cat-${indexC}`);
+        const adsCategoria = obtenerTodasPublicidadesParaPosicion([
+          `banner_cat_${cat.slug}`,
+          `banner_cat_${cat.id}`,
+          `P-Cat-${indexC}`
+        ]);
 
-        if (adCategoria && adCategoria.url_archivo) {
+        if (adsCategoria.length > 0) {
           const adBlock = document.createElement('div');
           adBlock.className = 'ad-banner-category';
-          adBlock.innerHTML = createAdMarkup(adCategoria);
+          renderizarBloquePublicidad(adBlock, adsCategoria, 'ad-banner-category');
           container.appendChild(adBlock);
         }
       }
@@ -1166,6 +1168,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // LÓGICA DE PUBLICIDAD (BANNERS Y POPUPS)
   // ==========================================
   let publicidadesCargadas = [];
+  const adRotatorIntervals = new Map();
 
   async function fetchPublicidades() {
     try {
@@ -1180,9 +1183,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function obtenerPublicidadParaPosicion(posicion) {
-    const filtro = publicidadesCargadas.filter(p => p.tipo === posicion && p.activo === 1);
-    if (filtro.length === 0) return null;
-    return filtro[Math.floor(Math.random() * filtro.length)];
+    const items = obtenerTodasPublicidadesParaPosicion(posicion);
+    if (items.length === 0) return null;
+    return items[Math.floor(Math.random() * items.length)];
+  }
+
+  function obtenerTodasPublicidadesParaPosicion(posiciones) {
+    const tipos = Array.isArray(posiciones) ? posiciones : [posiciones];
+    const matchingAds = publicidadesCargadas.filter(p => tipos.includes(p.tipo) && p.activo === 1);
+    
+    const items = [];
+    matchingAds.forEach(ad => {
+      if (!ad.url_archivo) return;
+      const urls = ad.url_archivo.split(',').map(u => u.trim()).filter(Boolean);
+      urls.forEach(url => {
+        items.push({
+          ...ad,
+          url_archivo: url
+        });
+      });
+    });
+    return items;
   }
 
   function createAdMarkup(ad) {
@@ -1199,42 +1220,93 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
   }
 
+  function renderizarBloquePublicidad(container, items, baseClass = '') {
+    if (!container) return;
+    
+    // Limpiar temporizador previo si existe para este contenedor
+    if (adRotatorIntervals.has(container)) {
+      clearInterval(adRotatorIntervals.get(container));
+      adRotatorIntervals.delete(container);
+    }
+
+    if (!items || items.length === 0) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+
+    if (baseClass) container.className = baseClass;
+    container.style.display = 'flex';
+
+    if (items.length === 1) {
+      container.innerHTML = createAdMarkup(items[0]);
+      return;
+    }
+
+    // Múltiples anuncios/GIFs: Renderizar Rotador animado automático
+    let activeIdx = 0;
+    const rotator = document.createElement('div');
+    rotator.className = 'ad-rotator-container';
+    
+    rotator.innerHTML = `
+      ${items.map((ad, idx) => `
+        <div class="ad-rotator-slide ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
+          ${createAdMarkup(ad)}
+        </div>
+      `).join('')}
+      <div class="ad-rotator-dots">
+        ${items.map((_, idx) => `<span class="ad-rotator-dot ${idx === 0 ? 'active' : ''}"></span>`).join('')}
+      </div>
+    `;
+
+    container.innerHTML = '';
+    container.appendChild(rotator);
+
+    const slides = rotator.querySelectorAll('.ad-rotator-slide');
+    const dots = rotator.querySelectorAll('.ad-rotator-dot');
+
+    const nextSlide = () => {
+      slides[activeIdx].classList.remove('active');
+      dots[activeIdx].classList.remove('active');
+      activeIdx = (activeIdx + 1) % slides.length;
+      slides[activeIdx].classList.add('active');
+      dots[activeIdx].classList.add('active');
+    };
+
+    let intervalId = setInterval(nextSlide, 4500);
+    adRotatorIntervals.set(container, intervalId);
+
+    // Pausar al pasar el mouse
+    rotator.addEventListener('mouseenter', () => clearInterval(intervalId));
+    rotator.addEventListener('mouseleave', () => {
+      clearInterval(intervalId);
+      intervalId = setInterval(nextSlide, 4500);
+      adRotatorIntervals.set(container, intervalId);
+    });
+  }
+
   function desplegarPublicidadesEstaticas() {
     // 1. Banner Superior
-    const topAd = obtenerPublicidadParaPosicion('P-Superior') || 
-                  obtenerPublicidadParaPosicion('P-Superior-Fino') ||
-                  obtenerPublicidadParaPosicion('banner_1200x200') || 
-                  obtenerPublicidadParaPosicion('banner_1200x100');
+    const topAds = obtenerTodasPublicidadesParaPosicion(['P-Superior', 'P-Superior-Fino', 'banner_1200x200', 'banner_1200x100']);
     const topContainer = document.getElementById('ad-top-banner');
-    if (topAd && topContainer) {
-      topContainer.className = (topAd.tipo === 'P-Superior' || topAd.tipo === 'banner_1200x200') 
-        ? 'ad-banner-1200x200' 
-        : 'ad-banner-1200x100';
-      topContainer.innerHTML = createAdMarkup(topAd);
-      topContainer.style.display = 'flex';
+    if (topContainer) {
+      const isLarge = topAds.some(a => a.tipo === 'P-Superior' || a.tipo === 'banner_1200x200');
+      renderizarBloquePublicidad(topContainer, topAds, isLarge ? 'ad-banner-1200x200' : 'ad-banner-1200x100');
     }
 
     // 2. Banners Laterales (Posiciones P3 y P4)
-    const adP3 = obtenerPublicidadParaPosicion('P3') || obtenerPublicidadParaPosicion('banner_300x300');
+    const adsP3 = obtenerTodasPublicidadesParaPosicion(['P3', 'banner_300x300']);
     const sidebarContainer1 = document.getElementById('ad-sidebar-banner-1');
-    if (sidebarContainer1 && adP3) {
-      sidebarContainer1.innerHTML = createAdMarkup(adP3);
-      sidebarContainer1.style.display = 'flex';
+    if (sidebarContainer1) {
+      renderizarBloquePublicidad(sidebarContainer1, adsP3, 'ad-banner-300x300');
     }
 
-    const adP4 = obtenerPublicidadParaPosicion('P4') || (() => {
-      const ads300 = publicidadesCargadas.filter(p => (p.tipo === 'banner_300x300' || p.tipo === 'P3' || p.tipo === 'P4') && p.activo === 1);
-      if (adP3) {
-        const indexP3 = ads300.findIndex(p => p.id === adP3.id);
-        const filtered = ads300.filter((_, idx) => idx !== indexP3);
-        if (filtered.length > 0) return filtered[Math.floor(Math.random() * filtered.length)];
-      }
-      return ads300[0] || null;
-    })();
+    const adsP4 = obtenerTodasPublicidadesParaPosicion(['P4']);
     const sidebarContainer2 = document.getElementById('ad-sidebar-banner-2');
-    if (sidebarContainer2 && adP4) {
-      sidebarContainer2.innerHTML = createAdMarkup(adP4);
-      sidebarContainer2.style.display = 'flex';
+    if (sidebarContainer2) {
+      // Si no hay anuncio configurado específicamente para P4, pero hay varios en P3 o 300x300, podemos rotar los restantes
+      const itemsP4 = adsP4.length > 0 ? adsP4 : adsP3.slice(1);
+      renderizarBloquePublicidad(sidebarContainer2, itemsP4, 'ad-banner-300x300');
     }
   }
 

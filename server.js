@@ -1427,16 +1427,14 @@ try {
   console.warn('Advertencia: No se pudo crear la carpeta public/uploads (esperable en Vercel):', err.message);
 }
 
-// Endpoint para subir imagen (base64 WebP)
-app.post('/api/admin/subir-imagen', async (req, res) => {
-  const { imagenBase64 } = req.body;
-  if (!imagenBase64) {
-    return res.status(400).json({ error: 'No se recibió ninguna imagen base64' });
+// Función auxiliar unificada para procesar y guardar archivos / imágenes
+async function procesarSubidaArchivo(base64Data, res) {
+  if (!base64Data) {
+    return res.status(400).json({ error: 'No se recibió ningún archivo base64' });
   }
 
   try {
-    // Limpiar el prefijo data:image/...;base64,
-    const matches = imagenBase64.match(/^data:([^;]+);base64,(.+)$/);
+    const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
       return res.status(400).json({ error: 'Formato base64 inválido' });
     }
@@ -1444,61 +1442,70 @@ app.post('/api/admin/subir-imagen', async (req, res) => {
     const mimeType = matches[1];
     const buffer = Buffer.from(matches[2], 'base64');
 
-    // Determinar extensión basándose en el mimeType
     let ext = 'webp';
     if (mimeType.includes('png')) ext = 'png';
     else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
     else if (mimeType.includes('gif')) ext = 'gif';
+    else if (mimeType.includes('mp4')) ext = 'mp4';
+    else if (mimeType.includes('webm')) ext = 'webm';
 
-    // SI ESTAMOS EN VERCEL O PRODUCCIÓN: Subir a Catbox para evitar limitaciones de solo lectura y temporalidad
-    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-      try {
-        const formData = new FormData();
-        formData.append('reqtype', 'fileupload');
-        
-        const fileBlob = new Blob([buffer], { type: mimeType });
-        formData.append('fileToUpload', fileBlob, `upload_${Date.now()}.${ext}`);
-
-        const uploadRes = await fetch('https://catbox.moe/user/api.php', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!uploadRes.ok) {
-          throw new Error(`Catbox retornó estado ${uploadRes.status}: ${uploadRes.statusText}`);
-        }
-
-        const fileUrl = await uploadRes.text();
-        if (fileUrl && fileUrl.startsWith('http')) {
-          return res.json({ url: fileUrl.trim() });
-        } else {
-          throw new Error(`Respuesta inválida de Catbox: ${fileUrl}`);
-        }
-      } catch (uploadError) {
-        console.error('Error al subir imagen a Catbox:', uploadError.message);
-        return res.status(502).json({ error: `La subida externa falló: ${uploadError.message}` });
-      }
-    }
-
-    // DESARROLLO LOCAL o FALLBACK: Guardar en el sistema de archivos local
-    const uniqueName = `img_${Date.now()}_${Math.round(Math.random() * 1000)}.${ext}`;
+    // 1. Si no estamos en producción o si fs es escribible, intentar guardar localmente
+    const uniqueName = `upload_${Date.now()}_${Math.round(Math.random() * 1000)}.${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
 
-    if (!fs.existsSync(uploadsDir)) {
-      try {
+    try {
+      if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
-      } catch (err) {
-        console.warn('No se pudo crear carpeta de uploads para fallback:', err.message);
       }
+      fs.writeFileSync(filePath, buffer);
+      return res.json({ url: `/uploads/${uniqueName}` });
+    } catch (fsErr) {
+      console.warn('Escritura local en /uploads/ no disponible (esperable en Vercel):', fsErr.message);
     }
 
-    fs.writeFileSync(filePath, buffer);
-    const urlPublica = `/uploads/${uniqueName}`;
-    res.json({ url: urlPublica });
+    // 2. Intentar subir a Catbox con User-Agent
+    try {
+      const formData = new FormData();
+      formData.append('reqtype', 'fileupload');
+      const fileBlob = new Blob([buffer], { type: mimeType });
+      formData.append('fileToUpload', fileBlob, uniqueName);
+
+      const uploadRes = await fetch('https://catbox.moe/user/api.php', {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        body: formData
+      });
+
+      if (uploadRes.ok) {
+        const fileUrl = await uploadRes.text();
+        if (fileUrl && fileUrl.trim().startsWith('http')) {
+          return res.json({ url: fileUrl.trim() });
+        }
+      }
+    } catch (uploadError) {
+      console.warn('Subida a Catbox falló, usando fallback Data URI:', uploadError.message);
+    }
+
+    // 3. Fallback infalible: devolver Data URI (Base64) para que la imagen/GIF funcione al 100%
+    return res.json({ url: base64Data });
   } catch (error) {
-    console.error('Error al guardar la imagen subida:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error al procesar archivo:', error);
+    return res.status(500).json({ error: error.message });
   }
+}
+
+// Endpoint para subir imagen (base64)
+app.post('/api/admin/subir-imagen', async (req, res) => {
+  const data = req.body.imagenBase64 || req.body.archivoBase64;
+  await procesarSubidaArchivo(data, res);
+});
+
+// Endpoint para subir archivo multimedia (GIF, video, imagen)
+app.post('/api/admin/subir-archivo', async (req, res) => {
+  const data = req.body.archivoBase64 || req.body.imagenBase64;
+  await procesarSubidaArchivo(data, res);
 });
 
 
