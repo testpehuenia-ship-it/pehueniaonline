@@ -1039,6 +1039,7 @@ app.get('/api/cron', async (req, res) => {
 // Obtener todas las categorías (sincronizando con almacén en la nube para persistencia serverless)
 const disenoMap = {
   'grid': 'g',
+  'grid-2col': '2',
   'carousel': 'c',
   'list': 'l',
   'featured': 'f',
@@ -1050,6 +1051,7 @@ const disenoMap = {
 
 const reverseDisenoMap = {
   'g': 'grid',
+  '2': 'grid-2col',
   'c': 'carousel',
   'l': 'list',
   'f': 'featured',

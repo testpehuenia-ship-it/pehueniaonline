@@ -1011,8 +1011,9 @@ document.addEventListener('DOMContentLoaded', () => {
     list.forEach((cat, index) => {
       const tr = document.createElement('tr');
       
-      let disenoLabel = 'Grilla estándar';
-      if (cat.diseno_home === 'carousel') disenoLabel = 'Carrusel horizontal';
+      let disenoLabel = 'Grilla (3 Columnas)';
+      if (cat.diseno_home === 'grid-2col') disenoLabel = 'Grilla (2 Columnas)';
+      else if (cat.diseno_home === 'carousel') disenoLabel = 'Carrusel horizontal';
       else if (cat.diseno_home === 'list') disenoLabel = 'Lista compacta';
       else if (cat.diseno_home === 'featured') disenoLabel = 'Destacada + Lista';
       else if (cat.diseno_home === 'mosaic') disenoLabel = 'Mosaico asimétrico';

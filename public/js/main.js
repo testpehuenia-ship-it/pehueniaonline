@@ -471,8 +471,14 @@ document.addEventListener('DOMContentLoaded', () => {
           
           wrapper.appendChild(track);
           postsContainer.appendChild(wrapper);
+        } else if (diseno === 'grid-2col') {
+          // 'grid-2col' (Grilla de 2 Columnas)
+          postsContainer.className = 'posts-grid-2col';
+          noticias.forEach(noticia => {
+            postsContainer.appendChild(createPostCardMarkup(noticia));
+          });
         } else {
-          // 'grid' (Por defecto)
+          // 'grid' (Por defecto 3 Columnas)
           postsContainer.className = 'posts-grid';
           noticias.forEach(noticia => {
             postsContainer.appendChild(createPostCardMarkup(noticia));

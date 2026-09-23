@@ -649,6 +649,13 @@ img {
   gap: 20px;
 }
 
+/* Grilla de Noticias Regular (2 Columnas) */
+.posts-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
 .post-card {
   background-color: var(--bg-secondary);
   border-radius: var(--border-radius-md);
@@ -2305,6 +2312,7 @@ img {
 
 @media (max-width: 640px) {
   .posts-grid,
+  .posts-grid-2col,
   .cat-block-span-3 .posts-grid,
   .cat-block-span-2 .posts-grid,
   .cat-block-span-1 .posts-grid {
